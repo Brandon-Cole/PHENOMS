@@ -2,7 +2,7 @@
 
 Python-Based HDX Sims
 
-![PHENOMS Logo](./assets/logo.png)
+![PHENOMS Logo](./assets/HDX_Image.png)
 
 ## Table of Contents
 - [Introduction](#introduction)
