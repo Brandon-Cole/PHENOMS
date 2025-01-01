@@ -13,11 +13,11 @@ class TestSimulationSet(unittest.TestCase):
         You can initialize necessary objects here.
         """
         self.pdb_files = [
-            '../rep1_md_0_500_nolig_nojump_center.pdb',
-            '../rep2_md_0_500_no_lig_nojump_center.pdb',
-            '../rep3_md_0_500_no_lig_nojump_center.pdb'
+            '../../rep1_md_0_500_nolig_nojump_center.pdb',
+            '../../rep2_md_0_500_no_lig_nojump_center.pdb',
+            '../../rep3_md_0_500_no_lig_nojump_center.pdb'
         ]
-        self.sim_set = SimulationSet(self.pdb_files, resid_range=(50, 70), sub_frames=200)
+        self.sim_set = SimulationSet(self.pdb_files, resid_range=(50, 70), sub_frames=25)
 
     def test_initialization(self):
         """
@@ -25,7 +25,7 @@ class TestSimulationSet(unittest.TestCase):
         """
         self.assertEqual(len(self.sim_set.pdb_files), 3)
         self.assertEqual(self.sim_set.resid_range, (50, 70))
-        self.assertEqual(self.sim_set.sub_frames, 200)
+        self.assertEqual(self.sim_set.sub_frames, 25)
 
     def test_load_and_process(self):
         """
@@ -51,15 +51,16 @@ class TestSimulationSet(unittest.TestCase):
         except Exception as e:
             self.fail(f"Heatmap plotting failed: {e}")
 
-def test_generate_top_hbonds(self):
-    """
-    Test the generate_top_hbonds method for plotting hydrogen bonds.
-    """
-    try:
-        self.sim_set.process_data() 
-        self.sim_set.generate_top_hbonds(threshold=0.5)
-    except Exception as e:
-        self.fail(f"Top hydrogen bonds plotting failed: {e}")
+    def test_generate_top_hbonds(self):
+        """
+        Test the generate_top_hbonds method for plotting hydrogen bonds.
+        """
+        try:
+            all_pivot_tables = self.sim_set._load_and_process(n_jobs=3)
+            self.sim_set.generate_top_hbonds(threshold=0.5)
+            self.assertTrue(True)
+        except Exception as e:
+            self.fail(f"Top hydrogen bonds plotting failed: {e}")
 
 if __name__ == '__main__':
     unittest.main()

@@ -14,6 +14,9 @@ Python-Based HDX Sims
 ## Introduction
 PHENOMS is a Python-package for simulating hydrogen-deuterium exchange (HDX) experiments. It provides a suite of tools to perform and analyze an in-silico HDX experiment using MD simulations.
 
+## Example Visualization from Protein-Ligand SAR Series
+![Example Visualization](./assets/example_fig.png)
+
 ## Installation
 
 
