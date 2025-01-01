@@ -1,6 +1,6 @@
 # PHENOMS
 
-Python-Based HDX Sims
+**P**ython-based **H**ydrogen-deuterium **E**xcha**N**ge **O**f **M**olecular dynamics **S**imulations
 
 ![PHENOMS Logo](./assets/HDX_Image.png)
 
