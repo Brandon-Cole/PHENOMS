@@ -29,12 +29,6 @@ conda activate phenoms
 pip install -e .
 ```
 
-**Interpreter path (example):**  
-`/Users/brandonnovy/miniconda3/envs/phenoms/bin/python`  
-(i.e. `~/miniconda3/envs/phenoms` after activation.)
-
-**Cursor / VS Code:** If your conda install lives elsewhere, set **Python: Select Interpreter** to that env’s `python`.
-
 **Rust extension (recommended for speed):** Install [Rust](https://rustup.rs/), then from the repo root:
 
 ```bash
@@ -117,6 +111,24 @@ sim = run_backbone_hbond_analysis(
 )
 ```
 
+### Optional auto-QC in `SimulationSet.run`
+
+```python
+sim = SimulationSet(["rep1.pdb", "rep2.pdb"], sub_frames=250)
+sim.run(
+    qc=True,
+    mdp_files=["rep1.mdp", "rep2.mdp"],   # optional
+    skip_mdp_consistency=False,           # set True to skip MDP checks
+    qc_fail_on_nonconverged=True,         # raises if any replicate fails RMSD convergence
+)
+qc_report = sim.get_qc_report()
+```
+
+QC currently includes:
+- RMSD-based convergence check per replicate (window-shift + drift check)
+- MDP key consistency check (when `mdp_files` are provided)
+- Informative failure messages showing which replicate/parameter failed
+
 ### Demo plots (repo test PDBs)
 
 ```bash
@@ -124,6 +136,23 @@ python scripts/run_test_data_plots.py --resid-range 50 70 --sub-frames 50
 ```
 
 Outputs default to `./phenom_outputs/test_plots/...` (or `$PHENOMS_OUTPUT_DIR/test_plots/...`). Use `--output-dir` to set an explicit base.
+
+### Trajectory preprocessing helpers (GROMACS + numbering)
+
+```bash
+# Export centered, fitted, protein-only multi-frame PDB from xtc+tpr
+python scripts/preprocess_gromacs_to_pdb.py \
+  --run-dir /path/to/run \
+  --out-dir /path/to/exports \
+  --frame-dt-ps 1000
+
+# Renumber many PDBs to a common reference sequence/numbering
+python scripts/renumber_many_to_reference.py \
+  --reference ref.pdb \
+  --mobile-dir ./exports \
+  --mobile-glob "*.pdb" \
+  --output-dir ./exports_renumbered
+```
 
 ## Outputs & benchmarks
 

@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 from tqdm import tqdm
+from phenoms.qc import check_mdp_key_consistency, rmsd_convergence_report
 
 
 def default_n_jobs():
@@ -75,8 +76,21 @@ class SimulationSet:
         self._pivot_tables = []
         self._bond_labels_sorted = []
         self._bond_statistics = None
+        self._qc_report = None
 
-    def run(self, n_jobs=None, use_rust=True):
+    def run(
+        self,
+        n_jobs=None,
+        use_rust=True,
+        *,
+        qc=False,
+        mdp_files=None,
+        skip_mdp_consistency=False,
+        qc_fail_on_nonconverged=True,
+        qc_last_fraction=0.2,
+        qc_mean_tolerance=0.05,
+        qc_slope_tolerance=1e-4,
+    ):
         """
         Load all trajectories, run Baker–Hubbard (N–O only), build pivot tables.
         If bond_statistics_threshold was set, compute per-replicate stats and mean ± std.
@@ -89,14 +103,39 @@ class SimulationSet:
         use_rust : bool
             If True, use Rust extension when available. Set False if Rust returns no bonds
             for your topology (MDTraj fallback).
+        qc : bool
+            If True, run a simple replicate QC pass (RMSD convergence and optional MDP checks).
+        mdp_files : list[str] or None
+            Optional list of .mdp paths to compare for parameter consistency.
+        skip_mdp_consistency : bool
+            If True, skip MDP checks even if mdp_files are supplied.
+        qc_fail_on_nonconverged : bool
+            If True, raise RuntimeError when any replicate fails RMSD convergence.
         """
         if n_jobs is None:
             n_jobs = default_n_jobs()
         all_hbonds_dfs = []
         all_bond_labels = set()
+        qc_report = {
+            "enabled": bool(qc),
+            "rmsd_convergence": [],
+            "all_replicates_converged": True,
+            "mdp_consistency": None,
+        }
 
         for pdb_file in tqdm(self.pdb_files, desc="Replicates", unit="replicate"):
             trajectory = load_and_select_residues(pdb_file, resid_range=None)
+            if qc:
+                rep = rmsd_convergence_report(
+                    trajectory,
+                    last_fraction=qc_last_fraction,
+                    mean_tolerance=qc_mean_tolerance,
+                    slope_tolerance=qc_slope_tolerance,
+                )
+                rep["pdb_file"] = str(pdb_file)
+                qc_report["rmsd_convergence"].append(rep)
+                if not rep["converged"]:
+                    qc_report["all_replicates_converged"] = False
             hbonds_df = process_frames(
                 trajectory,
                 sub_frames=self.sub_frames,
@@ -119,6 +158,29 @@ class SimulationSet:
 
         self._hbond_dfs = all_hbonds_dfs
         self._pivot_tables = all_pivot_tables
+        self._qc_report = qc_report
+
+        if qc and mdp_files and not skip_mdp_consistency:
+            mdp_rep = check_mdp_key_consistency(mdp_files)
+            self._qc_report["mdp_consistency"] = mdp_rep
+            if not mdp_rep["ok"]:
+                details = json.dumps(mdp_rep["mismatches"], indent=2)
+                raise RuntimeError(
+                    "MDP consistency check failed for key parameters.\n"
+                    f"Mismatched keys and values:\n{details}"
+                )
+
+        if qc and qc_fail_on_nonconverged and not self._qc_report["all_replicates_converged"]:
+            failed = [r for r in self._qc_report["rmsd_convergence"] if not r["converged"]]
+            details = "\n".join(
+                f"- {x['pdb_file']}: reason={x['reason']}, rel_diff={x.get('relative_mean_diff')}, "
+                f"slope={x.get('last_window_slope')}"
+                for x in failed
+            )
+            raise RuntimeError(
+                "QC failed: not all replicates passed RMSD convergence.\n"
+                f"Failed replicates:\n{details}"
+            )
 
         if self.bond_statistics_threshold is not None:
             self._compute_bond_statistics()
@@ -154,6 +216,11 @@ class SimulationSet:
             "bond_statistics_threshold": self.bond_statistics_threshold,
         }
         (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        if self._qc_report is not None:
+            (output_dir / "qc_report.json").write_text(
+                json.dumps(self._qc_report, indent=2, default=str),
+                encoding="utf-8",
+            )
 
     def _compute_bond_statistics(self):
         """Fill self._bond_statistics with mean/std lifetime and break frequency."""
@@ -176,6 +243,10 @@ class SimulationSet:
     def get_hbond_dfs(self):
         """Return list of per-replicate H-bond DataFrames (Bond Label, Frame, ...)."""
         return self._hbond_dfs
+
+    def get_qc_report(self):
+        """Return QC report dict from latest run (or None if QC was not enabled)."""
+        return getattr(self, "_qc_report", None)
 
     def get_pivot_tables(self):
         """Return list of per-replicate pivot tables (bond label x frame)."""

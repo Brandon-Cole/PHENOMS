@@ -60,6 +60,12 @@ from phenoms.cleanup import (
     renumber_many_to_reference,
     renumber_pdb_file,
 )
+from phenoms.qc import (
+    parse_mdp,
+    check_mdp_key_consistency,
+    assess_series_convergence,
+    rmsd_convergence_report,
+)
 
 __all__ = [
     "SimulationSet",
@@ -103,6 +109,10 @@ __all__ = [
     "renumber_pdb_file",
     "detect_hbonds",
     "detect_hbonds_with_occupancy",
+    "parse_mdp",
+    "check_mdp_key_consistency",
+    "assess_series_convergence",
+    "rmsd_convergence_report",
 ]
 
 __version__ = "0.1.0"
