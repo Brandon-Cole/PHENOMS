@@ -1,0 +1,15 @@
+[package]
+name = "phenoms_hbond_rs"
+version = "0.1.0"
+edition = "2021"
+description = "Baker-Hubbard H-bond detection in Rust for PHENOMS"
+
+[lib]
+name = "phenoms_hbond_rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.22", features = ["extension-module"] }
+numpy = "0.22"
+ndarray = "0.16"
+rayon = "1.10"

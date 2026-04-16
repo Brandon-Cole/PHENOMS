@@ -1,0 +1,15 @@
+# Docker build context (repo root). Keep phenoms/test_data/ for benchmarks.
+.git
+**/__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.egg-info
+target/
+phenoms/test_outputs/
+old_scripts/
+H_bond_work/
+.vscode/
+.cursor/
+**/.ipynb_checkpoints

@@ -1,0 +1,30 @@
+# Conda environment for PHENOMS (phenoms package).
+# Env name: phenoms  →  e.g. ~/miniconda3/envs/phenoms
+# Create:  conda env create -f environment.yml
+# Activate: conda activate phenoms
+# Update:   conda env update -f environment.yml --prune
+
+name: phenoms
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.8,<3.13
+  - mdtraj>=1.9
+  - polars>=1.0
+  - pandas>=1.0
+  - numpy>=1.20
+  - matplotlib>=3.5
+  - seaborn>=0.11
+  - tqdm>=4.60
+  - joblib>=1.0
+  - scikit-learn>=1.0
+  - networkx>=3.0
+  - pip
+  - pip:
+    - -e .   # install phenoms package in editable mode
+    - pytest>=7.0
+    - pytest-cov>=4.0
+    # optional benchmark dependency (also available via: pip install -e ".[benchmark]")
+    - mdanalysis>=2.4
+# Optional Rust: install Rust (rustup.rs), then: pip install maturin && maturin develop

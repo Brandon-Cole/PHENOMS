@@ -1,0 +1,41 @@
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+
+# Test and tooling caches
+.pytest_cache/
+.coverage
+.mypy_cache/
+
+# Build / packaging artifacts
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+# Rust extension build artifacts
+target/
+
+# Conda build artifacts
+condaenv.*.requirements.txt
+
+# Local heavy test artifacts (not source code)
+phenoms/test_data/
+phenoms/test_outputs/
+phenom_outputs/
+
+# Non-package project/work-in-progress docs
+H_bond_work/
+old_scripts/
+methods.md
+overview_fig_caption.md
+
+# Local editor/project state
+.vscode/
+.cursor/
+
+# Local exported structures
+protein_pdb_exports/
+
+*.svg
+*.cdxml
