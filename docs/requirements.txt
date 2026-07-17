@@ -1,4 +1,4 @@
-# Docs-only dependencies (also available via: pip install -e ".[docs]")
+# Docs build dependencies (CI / maintainers)
 sphinx>=7.0,<9
 shibuya>=2024.7.0
 myst-parser>=3.0

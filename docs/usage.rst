@@ -1,19 +1,24 @@
 Usage
 =====
 
-Outputs
--------
+Output location
+---------------
 
-By default, artifacts go under ``./phenom_outputs/``. Override with:
+Artifacts default to ``./phenom_outputs/`` next to your working directory.
+Override globally:
 
 .. code-block:: bash
 
    export PHENOMS_OUTPUT_DIR=/path/to/my_phenom_runs
 
+Or pass ``output_dir=`` / ``--output-dir`` per run.
+
 Simple form: multi-frame PDBs
 -----------------------------
 
-Backbone N–O analysis is the default (``backbone_only=True``):
+This is the recommended path when you already have protein-centered,
+fitted multi-frame PDBs. Backbone N–O analysis is the default
+(``backbone_only=True``):
 
 .. code-block:: python
 
@@ -21,12 +26,26 @@ Backbone N–O analysis is the default (``backbone_only=True``):
 
    sim = SimulationSet(
        pdb_files=["rep1.pdb", "rep2.pdb"],
-       resid_range=(50, 70),
-       sub_frames=100,
+       resid_range=(50, 70),       # plot filter only; None = whole protein
+       sub_frames=100,             # None = all frames
        backbone_only=True,
        output_dir=default_output_root() / "my_run" / "set_a",
    )
    sim.run()
+   # raw_data/*_hbonds.csv, *_occupancy.csv, *_pivot.csv, manifest.json
+
+One-shot helper:
+
+.. code-block:: python
+
+   from phenoms import run_backbone_hbond_analysis
+
+   sim = run_backbone_hbond_analysis(
+       ["r1.pdb", "r2.pdb"],
+       sub_frames=100,
+       plot_heatmaps=False,
+       output_dir=default_output_root() / "quick",
+   )
 
 Native trajectories
 -------------------
@@ -39,10 +58,20 @@ Load engine-native files without writing intermediate PDBs:
 
    sim = SimulationSet.from_trajectories(
        ["rep1.xtc", "rep2.xtc"],
-       topology="system.pdb",
+       topology="system.pdb",          # or topologies=[...]
        sub_frames=200,
+       backbone_only=True,
    )
    sim.run()
+
+Equivalent constructor form:
+
+.. code-block:: python
+
+   SimulationSet(
+       trajectories=["rep1.xtc", "rep2.xtc"],
+       topology="system.pdb",
+   )
 
 For PBC imaging / centering / fitting first, use
 :func:`phenoms.prepare_set_from_dir` or ``phenoms prep``.
@@ -50,7 +79,7 @@ For PBC imaging / centering / fitting first, use
 All-bond mode
 -------------
 
-Opt in when you need all donor/acceptor classes:
+Backbone N–O remains the HDX-style default. Opt into all donor/acceptor classes:
 
 .. code-block:: python
 
@@ -60,7 +89,8 @@ Opt in when you need all donor/acceptor classes:
 Comparison sets
 ---------------
 
-:class:`~phenoms.ComparisonSet` can be constructed before ``.run()``:
+:class:`~phenoms.ComparisonSet` may be constructed before ``.run()``; methods
+that need pivots validate at call time:
 
 .. code-block:: python
 
@@ -74,9 +104,14 @@ Comparison sets
    b.run()
    cmp.compare()
    cmp.export_comparison_artifacts(base / "comparison")
+   cmp.plot_difference()
+   # cmp.export_connectivity_graph_html("network.html")
 
 Engine folders (GROMACS / OpenMM / AMBER)
 -----------------------------------------
+
+Directory helpers discover replicates, normalize to protein-only multi-frame
+PDBs, then return ready ``SimulationSet`` objects:
 
 .. code-block:: python
 
@@ -86,6 +121,8 @@ Engine folders (GROMACS / OpenMM / AMBER)
        input_dir="./wt_set",
        prepared_dir="./prepared/wt",
        frame_dt_ps=1000,
+       start_ps=1000,
+       end_ps=500000,
    ).run()
 
    set_a, set_b, comp = comparison_sets_from_dirs(
@@ -100,8 +137,16 @@ Engine folders (GROMACS / OpenMM / AMBER)
    set_b.run()
    comp.compare()
 
+Required files per replicate directory:
+
+* **GROMACS**: ``.xtc``/``.trr`` + topology ``.tpr`` (preferred) or ``.gro``/``.pdb``
+* **OpenMM**: ``.dcd``/``.xtc`` + ``.pdb``/``.prmtop``
+* **AMBER**: ``.nc``/``.mdcrd`` + ``.prmtop``/``.parm7``
+
 Direct detection helpers
 ------------------------
+
+Skip the ``SimulationSet`` wrapper when you only need bond tables:
 
 .. code-block:: python
 
@@ -113,3 +158,41 @@ Direct detection helpers
        "trajectory.pdb",
        output_csv_path="hbond_occupancy.csv",
    )
+
+Quality control
+---------------
+
+Optional fail-fast QC inside ``SimulationSet.run``:
+
+.. code-block:: python
+
+   sim = SimulationSet(["rep1.pdb", "rep2.pdb"], sub_frames=250)
+   sim.run(
+       qc=True,
+       mdp_files=["rep1.mdp", "rep2.mdp"],  # optional GROMACS consistency
+       qc_fail_on_nonconverged=True,
+   )
+   report = sim.get_qc_report()
+
+Checks include:
+
+* RMSD window-shift / drift convergence per replicate
+* MDP key consistency when ``mdp_files`` are provided
+
+Renumbering & GROMACS export scripts
+------------------------------------
+
+For mismatched residue numbering across mutants/constructs:
+
+.. code-block:: bash
+
+   python scripts/renumber_many_to_reference.py \
+     --reference ref.pdb --mobile-dir ./exports \
+     --mobile-glob "*.pdb" --output-dir ./exports_renumbered
+
+Standalone GROMACS → PDB helper:
+
+.. code-block:: bash
+
+   python scripts/preprocess_gromacs_to_pdb.py \
+     --run-dir /path/to/run --out-dir /path/to/exports --frame-dt-ps 1000

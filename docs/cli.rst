@@ -1,7 +1,8 @@
 Command-line interface
 ======================
 
-The Python API is primary. After ``pip install -e .``, a Click CLI is also available:
+The Python API is primary. After ``pip install -e .``, a Click CLI mirrors common
+workflows:
 
 .. code-block:: bash
 
@@ -11,22 +12,35 @@ The Python API is primary. After ``pip install -e .``, a Click CLI is also avail
 ``phenoms prep``
 ----------------
 
-Normalize GROMACS / OpenMM / AMBER replicate folders to multi-frame PDBs:
+Normalize GROMACS / OpenMM / AMBER replicate folders to multi-frame PDBs
+(imaging / center / fit, protein-only):
 
 .. code-block:: bash
 
-   phenoms prep --input-dir ./wt_set --prepared-dir ./prepared/wt
+   phenoms prep --input-dir ./wt_set --prepared-dir ./prepared/wt \
+     --frame-dt-ps 1000 --start-ps 1000 --end-ps 500000
+
+Flags: ``--no-imaging``, ``--no-center``, ``--no-fit``.
 
 ``phenoms run``
 ---------------
 
-Analyze PDB replicates or native trajectories:
+Analyze PDB replicates **or** native trajectories (not both in one invocation):
 
 .. code-block:: bash
 
-   phenoms run --pdb rep1.pdb --pdb rep2.pdb --sub-frames 100 --output-dir ./out
+   # PDB form
+   phenoms run --pdb rep1.pdb --pdb rep2.pdb \
+     --sub-frames 100 --output-dir ./out
+
+   # Native traj + shared topology
    phenoms run --traj rep1.xtc --traj rep2.xtc --topology top.pdb
-   phenoms run --pdb rep1.pdb --all-bonds   # opt into all-bond mode
+
+   # All-bond mode (default is backbone N–O only)
+   phenoms run --pdb rep1.pdb --all-bonds
+
+   # Optional QC
+   phenoms run --pdb rep1.pdb --pdb rep2.pdb --qc
 
 ``phenoms compare``
 -------------------
@@ -38,4 +52,5 @@ Prep two class directories, run analysis, and export comparison artifacts:
    phenoms compare \
      --dir-a ./wt --dir-b ./mut \
      --prepared-dir-a ./prepared/wt --prepared-dir-b ./prepared/mut \
-     --label-a wt --label-b mut
+     --label-a wt --label-b mut \
+     --output-dir ./phenom_outputs/cli_compare

@@ -95,6 +95,7 @@ html_theme_options = {
         {"title": "Installation", "url": "installation"},
         {"title": "Usage", "url": "usage"},
         {"title": "CLI", "url": "cli"},
+        {"title": "Outputs", "url": "outputs"},
         {"title": "API", "url": "api/index"},
     ],
 }
