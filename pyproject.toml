@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "phenoms"
-version = "0.1.0"
+version = "0.2.0"
 description = "Backbone H-bond network analysis for MD simulations (HDX-MS style)"
 readme = "README.md"
 license = { text = "MIT" }
@@ -28,12 +28,16 @@ dependencies = [
     "joblib>=1.0",
     "scikit-learn>=1.0",
     "networkx>=3.0",
+    "click>=8.0",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "pytest-cov>=4.0"]
 structure = ["biopython>=1.79"]
 benchmark = ["MDAnalysis>=2.4"]
+
+[project.scripts]
+phenoms = "phenoms.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -1,14 +1,13 @@
 """
 PHENOMS: Backbone H-bond network analysis for MD simulations (HDX-MS style).
 
-Public API:
-- SimulationSet: main class for single or replicate trajectories (region or whole protein).
-- ComparisonSet: two-run differential analysis and exports.
-- default_output_root: where CSVs/benchmarks go by default (``PHENOMS_OUTPUT_DIR`` or ./phenom_outputs).
-- detect_hbonds / detect_hbonds_with_occupancy: direct Rust-backed H-bond detection (all bonds or backbone-only).
-- load_trajectory, load_and_select_residues: I/O helpers.
-- run_backbone_hbond_analysis: one-shot function for region-based analysis.
-- cleanup (optional): align_and_renumber_pdb / renumber_many_to_reference for mismatched PDB numbering.
+High-level API:
+- SimulationSet / ComparisonSet: replicate analysis and differential comparison
+- simulation_set_from_dir / comparison_sets_from_dirs: prep + analyze from engine folders
+- detect_hbonds / detect_hbonds_with_occupancy: direct detection helpers
+- run_backbone_hbond_analysis: one-shot PDB workflow
+
+Also see the ``phenoms`` CLI (``phenoms --help``) for prep / run / compare.
 """
 
 from phenoms.io import load_trajectory, load_and_select_residues
@@ -75,10 +74,17 @@ from phenoms.preprocess import (
 )
 
 __all__ = [
+    # High-level workflow
     "SimulationSet",
+    "ComparisonSet",
     "default_n_jobs",
     "default_output_root",
-    "ComparisonSet",
+    "run_backbone_hbond_analysis",
+    "simulation_set_from_dir",
+    "comparison_sets_from_dirs",
+    "detect_hbonds",
+    "detect_hbonds_with_occupancy",
+    # Comparison helpers
     "compare_two_sets",
     "aggregate_pivot_by_donor",
     "differentially_protected",
@@ -86,6 +92,7 @@ __all__ = [
     "plot_difference",
     "suggest_difference_threshold_autocorr",
     "run_manifold_suite",
+    # I/O + detection
     "load_trajectory",
     "load_and_select_residues",
     "label_hbond",
@@ -99,13 +106,14 @@ __all__ = [
     "extract_residue_numbers",
     "create_pivot_table",
     "calculate_bond_statistics",
+    # Plotting
     "plot_heatmap",
     "plot_heatmap_with_legend",
     "plot_top_hbonds",
     "plot_aggregated_heatmap",
     "plot_bond_lifetimes_with_error_bars",
     "plot_break_frequencies_with_error_bars",
-    "run_backbone_hbond_analysis",
+    # Structure / cleanup / QC / preprocess
     "write_pdb_bfactors",
     "RenumberReport",
     "ResidueKey",
@@ -114,8 +122,6 @@ __all__ = [
     "ordered_residue_run",
     "renumber_many_to_reference",
     "renumber_pdb_file",
-    "detect_hbonds",
-    "detect_hbonds_with_occupancy",
     "parse_mdp",
     "check_mdp_key_consistency",
     "assess_series_convergence",
@@ -125,11 +131,9 @@ __all__ = [
     "discover_replicate_dirs",
     "normalize_replicate_to_pdb",
     "prepare_set_from_dir",
-    "simulation_set_from_dir",
-    "comparison_sets_from_dirs",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 
 def run_backbone_hbond_analysis(
@@ -140,33 +144,15 @@ def run_backbone_hbond_analysis(
     plot_heatmaps=True,
     bond_statistics_threshold=None,
     output_dir=None,
+    *,
+    backbone_only=True,
 ):
     """
-    One-shot: load replicates, run N–O H-bond analysis, build pivot tables,
-    optionally plot heatmaps and/or compute bond statistics (whole-protein style).
+    One-shot: load replicates, run H-bond analysis, build pivot tables,
+    optionally plot heatmaps and/or compute bond statistics.
 
-    Parameters
-    ----------
-    pdb_files : list of str
-        Paths to PDB files (single or replicates).
-    resid_range : tuple (int, int) or None
-        Residue range; None = whole protein.
-    sub_frames : int or None
-        Frames per replicate; omit or ``None`` = full trajectory.
-    n_jobs : int or None
-        MDTraj workers; omit or ``None`` = all CPUs minus two.
-    plot_heatmaps : bool
-        If True, show heatmap per replicate.
-    bond_statistics_threshold : float or None
-        If set (e.g. 0.5), compute mean/std lifetime and break frequency across
-        replicates and show bar plots (whole-protein workflow).
-    output_dir : str, pathlib.Path, or None
-        If set, CSV artifacts are written under ``output_dir/raw_data/`` after ``run()``.
-
-    Returns
-    -------
-    sim : SimulationSet
-        After run(); use sim.get_pivot_tables(), sim.get_hbond_dfs(), etc.
+    Defaults to backbone N–O mode (``backbone_only=True``). Pass
+    ``backbone_only=False`` for all-bond detection.
     """
     sim = SimulationSet(
         pdb_files=pdb_files,
@@ -174,6 +160,7 @@ def run_backbone_hbond_analysis(
         sub_frames=sub_frames,
         bond_statistics_threshold=bond_statistics_threshold,
         output_dir=output_dir,
+        backbone_only=backbone_only,
     )
     sim.run(n_jobs=n_jobs)
     if plot_heatmaps:
@@ -185,20 +172,23 @@ def run_backbone_hbond_analysis(
 
 
 def detect_hbonds(
-    pdb_file,
+    path,
     *,
+    top=None,
     sub_frames=None,
     n_jobs=None,
     use_rust=True,
-    backbone_only=False,
+    backbone_only=True,
 ):
     """
-    Detect hydrogen bonds from a trajectory PDB path with optional Rust acceleration.
+    Detect hydrogen bonds from a PDB or native trajectory path.
 
     Parameters
     ----------
-    pdb_file : str
-        Input trajectory/topology path.
+    path : str
+        Trajectory / PDB path.
+    top : str or None
+        Topology for native MD formats (``.xtc``/``.nc``/…).
     sub_frames : int or None
         Number of frames to process; None uses all.
     n_jobs : int or None
@@ -206,12 +196,12 @@ def detect_hbonds(
     use_rust : bool
         If True, use Rust backend when available.
     backbone_only : bool
-        If True, keep only backbone-relevant N-O labels. If False (default), return
-        all detected donor/acceptor H-bonds.
+        If True (default), keep only backbone N–O labels. If False, return all
+        detected donor/acceptor H-bonds.
     """
     if n_jobs is None:
         n_jobs = default_n_jobs()
-    traj = load_trajectory(pdb_file)
+    traj = load_trajectory(path, top=top)
     if backbone_only:
         return process_frames(
             traj,
@@ -228,12 +218,13 @@ def detect_hbonds(
 
 
 def detect_hbonds_with_occupancy(
-    pdb_file,
+    path,
     *,
+    top=None,
     sub_frames=None,
     n_jobs=None,
     use_rust=True,
-    backbone_only=False,
+    backbone_only=True,
     output_csv_path=None,
 ):
     """
@@ -241,7 +232,8 @@ def detect_hbonds_with_occupancy(
     Optionally writes occupancy summary CSV.
     """
     hbonds_df = detect_hbonds(
-        pdb_file,
+        path,
+        top=top,
         sub_frames=sub_frames,
         n_jobs=n_jobs,
         use_rust=use_rust,
@@ -267,13 +259,13 @@ def simulation_set_from_dir(
     apply_imaging=True,
     center=True,
     fit=True,
+    backbone_only=True,
 ):
     """
     Build a SimulationSet from a replicate directory or set directory.
 
-    `input_dir` can be:
-    - one replicate directory (contains files for one sim), or
-    - one set directory containing replicate subdirectories.
+    Normalizes engine-native inputs (GROMACS/OpenMM/AMBER) to multi-frame PDBs,
+    then returns a ready-to-``.run()`` SimulationSet. Backbone-only is the default.
     """
     pdb_files = prepare_set_from_dir(
         input_dir,
@@ -291,6 +283,7 @@ def simulation_set_from_dir(
         sub_frames=sub_frames,
         bond_statistics_threshold=bond_statistics_threshold,
         output_dir=output_dir,
+        backbone_only=backbone_only,
     )
 
 
@@ -313,6 +306,7 @@ def comparison_sets_from_dirs(
     fit=True,
     label_a="set_a",
     label_b="set_b",
+    backbone_only=True,
 ):
     """
     Build two SimulationSet objects from two class directories (e.g., WT and MUT).
@@ -332,6 +326,7 @@ def comparison_sets_from_dirs(
         apply_imaging=apply_imaging,
         center=center,
         fit=fit,
+        backbone_only=backbone_only,
     )
     set_b = simulation_set_from_dir(
         dir_b,
@@ -346,5 +341,6 @@ def comparison_sets_from_dirs(
         apply_imaging=apply_imaging,
         center=center,
         fit=fit,
+        backbone_only=backbone_only,
     )
     return set_a, set_b, ComparisonSet(set_a, set_b, label_a=label_a, label_b=label_b)

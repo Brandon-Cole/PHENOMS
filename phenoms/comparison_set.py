@@ -16,8 +16,6 @@ class ComparisonSet:
     """Two simulation sets (e.g. no ligand vs ligand): compare, plot difference, write PDB, run PCA/t-SNE/Isomap."""
 
     def __init__(self, set_a, set_b, label_a="set_a", label_b="set_b"):
-        if not set_a.get_pivot_tables() or not set_b.get_pivot_tables():
-            raise ValueError("Both SimulationSets must be run first (.run()).")
         self.set_a = set_a
         self.set_b = set_b
         self.label_a = label_a
@@ -25,12 +23,17 @@ class ComparisonSet:
         self._comparison_df = None
         self._comparison_params = None
 
+    def _require_both_run(self):
+        if not self.set_a.get_pivot_tables() or not self.set_b.get_pivot_tables():
+            raise ValueError("Both SimulationSets must be run first (.run()).")
+
     def compare(
         self,
         impute_threshold=0.4,
         flip_difference=False,
         donor_aggregation="sum",
     ):
+        self._require_both_run()
         from phenoms.comparison import compare_two_sets
         self._comparison_df = compare_two_sets(
             self.set_a.get_pivot_tables(),
@@ -65,6 +68,7 @@ class ComparisonSet:
           - "diff": edges sized by abs(Δ occupancy) and colored by sign (sign consistent with flip_difference in compare()).
           - "set_a" / "set_b": edges sized by occupancy (no sign).
         """
+        self._require_both_run()
         from phenoms.connectivity import (
             bond_delta_from_pivot_tables,
             bond_occupancy_from_pivot_tables,
@@ -138,6 +142,7 @@ class ComparisonSet:
           - "diff": edges use delta occupancy (sign preserved).
           - "set_a"/"set_b": edges use occupancy in that set.
         """
+        self._require_both_run()
         from phenoms.connectivity import (
             bond_delta_from_pivot_tables,
             bond_occupancy_from_pivot_tables,
@@ -219,6 +224,7 @@ class ComparisonSet:
 
     def get_unified_bond_labels(self):
         """Union of all bond labels from both sets, sorted (for aligned heatmaps)."""
+        self._require_both_run()
         if self.set_a.resid_range != self.set_b.resid_range:
             raise ValueError(
                 "plotting resid_range must match between set_a and set_b for aligned heatmaps/PCA."
@@ -232,6 +238,7 @@ class ComparisonSet:
         Plot heatmaps for all replicates in both sets using a unified bond list,
         so the same H-bonds appear in the same order on every heatmap (missing bonds = 0).
         """
+        self._require_both_run()
         unified = self.get_unified_bond_labels()
         region_str = self.set_a._plot_region_str()
         plot_fn = plot_heatmap_with_legend if use_legend else plot_heatmap

@@ -15,8 +15,8 @@ def default_n_jobs():
     """Parallel workers for MDTraj frame loop: all CPUs minus two (minimum 1)."""
     return max(1, (os.cpu_count() or 4) - 2)
 
-from phenoms.io import load_and_select_residues
-from phenoms.hbond import hbond_occupancy_table, process_frames
+from phenoms.io import load_and_select_residues, normalize_topology_list
+from phenoms.hbond import hbond_occupancy_table, process_frames, process_frames_all
 from phenoms.analysis import extract_residue_numbers, create_pivot_table, calculate_bond_statistics, fluctuating_bonds
 from phenoms.plotting import (
     plot_heatmap,
@@ -31,30 +31,39 @@ from phenoms.plotting import (
 
 class SimulationSet:
     """
-    Single or replicate MD simulations with backbone N–O H-bond analysis.
+    Single or replicate MD simulations with H-bond analysis.
 
-    - resid_range=None: whole protein (no plot filtering).
-    - resid_range=(start, end): filter bonds for heatmaps and manifold (PCA/t-SNE/Isomap),
-      while running the underlying H-bond analysis on the entire protein.
-    - bond_statistics_threshold: if set, compute per-replicate bond lifetime and
-      break frequency, then mean ± std across replicates (whole-protein style).
+    Simple form (unchanged): pass multi-frame PDB paths via ``pdb_files``.
+
+    Native trajectories: pass ``trajectories=`` plus ``topology=`` / ``topologies=``,
+    or use :meth:`from_trajectories`.
+
+    - ``backbone_only=True`` (default): Baker–Hubbard backbone N–O bonds (HDX-style).
+    - ``backbone_only=False``: all detected donor/acceptor H-bonds.
+    - ``resid_range``: filters heatmaps / manifold plots only; detection still runs on protein.
     """
 
     def __init__(
         self,
-        pdb_files,
+        pdb_files=None,
         resid_range=None,
         sub_frames=None,
         bond_statistics_threshold=None,
         output_dir=None,
+        *,
+        trajectories=None,
+        topology=None,
+        topologies=None,
+        backbone_only=True,
     ):
         """
         Parameters
         ----------
-        pdb_files : list of str or str
-            One or more PDB paths. If single path, pass [path].
+        pdb_files : list of str or str or None
+            Multi-frame PDB paths (simple / recommended form). Mutually exclusive with
+            ``trajectories``.
         resid_range : tuple (int, int) or None
-            Residue range for analysis; None = whole protein.
+            Residue range for plot filtering; None = whole protein.
         sub_frames : int or None
             Number of frames to analyze per replicate. Omit or ``None`` = entire trajectory.
         bond_statistics_threshold : float or None
@@ -63,13 +72,51 @@ class SimulationSet:
         output_dir : str, pathlib.Path, or None
             If set, after a successful :meth:`run`, per-replicate CSVs and a manifest are
             written under ``output_dir/raw_data/`` (see :meth:`export_run_artifacts`).
+        trajectories : list of str or str or None
+            Native trajectory files (``.xtc``, ``.trr``, ``.dcd``, ``.nc``, …).
+            Requires ``topology`` or ``topologies``.
+        topology : str or path-like or None
+            Shared topology for all ``trajectories``.
+        topologies : list of str or None
+            Per-replicate topologies (same length as ``trajectories``).
+        backbone_only : bool
+            If True (default), detect backbone N–O H-bonds only. If False, detect all
+            Baker–Hubbard H-bonds.
         """
-        if isinstance(pdb_files, str):
-            pdb_files = [pdb_files]
-        self.pdb_files = list(pdb_files)
+        if pdb_files is not None and trajectories is not None:
+            raise ValueError("Pass either pdb_files= or trajectories=, not both.")
+        if pdb_files is None and trajectories is None:
+            raise ValueError("Provide pdb_files= (simple form) or trajectories= (native MD).")
+
+        if trajectories is not None:
+            if isinstance(trajectories, (str, Path)):
+                trajectories = [trajectories]
+            input_files = [str(Path(p).expanduser()) for p in trajectories]
+            tops = normalize_topology_list(
+                len(input_files), topology=topology, topologies=topologies
+            )
+            if tops is None or any(t is None for t in tops):
+                raise ValueError(
+                    "Native trajectories require topology= (shared) or topologies= "
+                    "(one per replicate)."
+                )
+            self.topologies = tops
+            self.input_kind = "trajectory"
+        else:
+            if isinstance(pdb_files, (str, Path)):
+                pdb_files = [pdb_files]
+            input_files = [str(Path(p).expanduser()) for p in pdb_files]
+            if topology is not None or topologies is not None:
+                raise ValueError("topology=/topologies= only apply with trajectories=.")
+            self.topologies = None
+            self.input_kind = "pdb"
+
+        # Kept for backward compatibility (artifact stems / replicate labels).
+        self.pdb_files = input_files
         self.resid_range = resid_range
         self.sub_frames = sub_frames
         self.bond_statistics_threshold = bond_statistics_threshold
+        self.backbone_only = bool(backbone_only)
         self.output_dir = Path(output_dir).expanduser().resolve() if output_dir is not None else None
 
         self._hbond_dfs = []
@@ -77,6 +124,31 @@ class SimulationSet:
         self._bond_labels_sorted = []
         self._bond_statistics = None
         self._qc_report = None
+
+    @classmethod
+    def from_trajectories(
+        cls,
+        trajectories,
+        topology=None,
+        topologies=None,
+        *,
+        resid_range=None,
+        sub_frames=None,
+        bond_statistics_threshold=None,
+        output_dir=None,
+        backbone_only=True,
+    ):
+        """Build a SimulationSet from native MD trajectory + topology file(s)."""
+        return cls(
+            trajectories=trajectories,
+            topology=topology,
+            topologies=topologies,
+            resid_range=resid_range,
+            sub_frames=sub_frames,
+            bond_statistics_threshold=bond_statistics_threshold,
+            output_dir=output_dir,
+            backbone_only=backbone_only,
+        )
 
     def run(
         self,
@@ -92,7 +164,7 @@ class SimulationSet:
         qc_slope_tolerance=1e-4,
     ):
         """
-        Load all trajectories, run Baker–Hubbard (N–O only), build pivot tables.
+        Load all trajectories, run Baker–Hubbard detection, build pivot tables.
         If bond_statistics_threshold was set, compute per-replicate stats and mean ± std.
 
         Parameters
@@ -114,6 +186,7 @@ class SimulationSet:
         """
         if n_jobs is None:
             n_jobs = default_n_jobs()
+        process_fn = process_frames if self.backbone_only else process_frames_all
         all_hbonds_dfs = []
         all_bond_labels = set()
         qc_report = {
@@ -121,10 +194,12 @@ class SimulationSet:
             "rmsd_convergence": [],
             "all_replicates_converged": True,
             "mdp_consistency": None,
+            "backbone_only": self.backbone_only,
         }
 
-        for pdb_file in tqdm(self.pdb_files, desc="Replicates", unit="replicate"):
-            trajectory = load_and_select_residues(pdb_file, resid_range=None)
+        for i, input_path in enumerate(tqdm(self.pdb_files, desc="Replicates", unit="replicate")):
+            top = None if self.topologies is None else self.topologies[i]
+            trajectory = load_and_select_residues(input_path, resid_range=None, top=top)
             if qc:
                 rep = rmsd_convergence_report(
                     trajectory,
@@ -132,11 +207,12 @@ class SimulationSet:
                     mean_tolerance=qc_mean_tolerance,
                     slope_tolerance=qc_slope_tolerance,
                 )
-                rep["pdb_file"] = str(pdb_file)
+                rep["input_file"] = str(input_path)
+                rep["pdb_file"] = str(input_path)  # backward-compatible key
                 qc_report["rmsd_convergence"].append(rep)
                 if not rep["converged"]:
                     qc_report["all_replicates_converged"] = False
-            hbonds_df = process_frames(
+            hbonds_df = process_fn(
                 trajectory,
                 sub_frames=self.sub_frames,
                 n_jobs=n_jobs,
@@ -210,10 +286,13 @@ class SimulationSet:
             stem = Path(self.pdb_files[i]).stem
             pivot.to_csv(raw / f"{stem}_pivot.csv")
         manifest = {
+            "input_kind": self.input_kind,
             "pdb_files": [str(p) for p in self.pdb_files],
+            "topologies": self.topologies,
             "resid_range": self.resid_range,
             "sub_frames": self.sub_frames,
             "bond_statistics_threshold": self.bond_statistics_threshold,
+            "backbone_only": self.backbone_only,
         }
         (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
         if self._qc_report is not None:
@@ -243,6 +322,12 @@ class SimulationSet:
     def get_hbond_dfs(self):
         """Return list of per-replicate H-bond DataFrames (Bond Label, Frame, ...)."""
         return self._hbond_dfs
+
+    def get_occupancy_tables(self):
+        """Return list of per-replicate occupancy summary DataFrames."""
+        if not self._hbond_dfs:
+            raise ValueError("No data. Run .run() first.")
+        return [hbond_occupancy_table(df) for df in self._hbond_dfs]
 
     def get_qc_report(self):
         """Return QC report dict from latest run (or None if QC was not enabled)."""

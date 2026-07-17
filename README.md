@@ -15,8 +15,10 @@ Python-based Hydrogen-Deuterium Exchange of Molecular Dynamics Simulations
 ## Introduction
 PHENOMS is a Python package for MD-based hydrogen-bond/HDX-style analysis across single trajectories or comparison sets. It supports:
 - Rust-accelerated Baker-Hubbard-style H-bond detection
-- Backbone-only or all-H-bond analysis
+- Backbone-only (default) or optional all-H-bond analysis
+- Simple multi-frame PDB inputs, or native traj+topology loading
 - Occupancy tables, heatmaps, differential comparison, and connectivity exports
+- Optional Click CLI (`phenoms`) alongside the Python API
 - Reproducible benchmarking (local or Docker; 4-thread defaults with optional 1-CPU reference mode)
 
 ## Installation
@@ -50,19 +52,50 @@ By default, scripts and `SimulationSet(..., output_dir=...)` write under **`./ph
 export PHENOMS_OUTPUT_DIR=/path/to/my_phenom_runs
 ```
 
-### Single simulation set (backbone N-O)
+### Single simulation set (backbone N-O, default)
 
 ```python
 from phenoms import SimulationSet, default_output_root
 
 sim = SimulationSet(
-    pdb_files=["rep1.pdb", "rep2.pdb"],
+    pdb_files=["rep1.pdb", "rep2.pdb"],  # simple multi-frame PDB form
     resid_range=(50, 70),  # None = whole protein for heatmap focus
     sub_frames=100,
+    backbone_only=True,  # default; set False for all H-bonds
     output_dir=default_output_root() / "my_run" / "set_a",
 )
 sim.run()
 # CSVs: output_dir/raw_data/*_hbonds.csv, *_occupancy.csv, *_pivot.csv, manifest.json
+```
+
+### Native trajectories (optional)
+
+Keep using PDBs when you already have them. For engine-native files:
+
+**A. Load traj + topology directly** (no intermediate PDB export):
+
+```python
+from phenoms import SimulationSet
+
+sim = SimulationSet.from_trajectories(
+    ["rep1.xtc", "rep2.xtc"],
+    topology="system.pdb",  # or topologies=["r1.pdb", "r2.pdb"]
+    sub_frames=200,
+    backbone_only=True,  # default
+)
+sim.run()
+```
+
+**B. Normalize folders first** (imaging / centering / fitting), then analyze — see
+engine-agnostic prep below or `phenoms prep`.
+
+### All-bond mode
+
+Backbone N-O remains the default (HDX-style). Opt into all donor/acceptor classes:
+
+```python
+sim = SimulationSet(["rep1.pdb"], backbone_only=False, sub_frames=100)
+sim.run()
 ```
 
 ### Two sets (comparison)
@@ -71,11 +104,27 @@ sim.run()
 from phenoms import SimulationSet, ComparisonSet, default_output_root
 
 base = default_output_root() / "my_run"
-a = SimulationSet(pdb_files=["a1.pdb", "a2.pdb"], resid_range=(50, 70), sub_frames=100).run()
-b = SimulationSet(pdb_files=["b1.pdb", "b2.pdb"], resid_range=(50, 70), sub_frames=100).run()
-cmp = ComparisonSet(a, b, label_a="apo", label_b="holo")
+a = SimulationSet(pdb_files=["a1.pdb", "a2.pdb"], resid_range=(50, 70), sub_frames=100)
+b = SimulationSet(pdb_files=["b1.pdb", "b2.pdb"], resid_range=(50, 70), sub_frames=100)
+cmp = ComparisonSet(a, b, label_a="apo", label_b="holo")  # ok before .run()
+a.run()
+b.run()
 cmp.compare()
 cmp.export_comparison_artifacts(base / "comparison")
+```
+
+### CLI (optional; Python API is primary)
+
+After `pip install -e .`:
+
+```bash
+phenoms --help
+phenoms prep --input-dir ./wt_set --prepared-dir ./prepared/wt
+phenoms run --pdb rep1.pdb --pdb rep2.pdb --sub-frames 100 --output-dir ./out
+phenoms run --traj rep1.xtc --traj rep2.xtc --topology top.pdb --all-bonds
+phenoms compare --dir-a ./wt --dir-b ./mut \
+  --prepared-dir-a ./prepared/wt --prepared-dir-b ./prepared/mut \
+  --label-a wt --label-b mut
 ```
 
 ### H-bond detection only (API)
@@ -83,16 +132,19 @@ cmp.export_comparison_artifacts(base / "comparison")
 ```python
 from phenoms import detect_hbonds, detect_hbonds_with_occupancy
 
-# All donor/acceptor classes (Rust when built)
-df_all = detect_hbonds("trajectory.pdb", sub_frames=500, backbone_only=False, use_rust=True)
-
-# Backbone N-O only (same as SimulationSet pipeline)
+# Backbone N-O (default)
 df_bb = detect_hbonds("trajectory.pdb", backbone_only=True, use_rust=True)
+
+# All donor/acceptor classes
+df_all = detect_hbonds("trajectory.pdb", sub_frames=500, backbone_only=False)
+
+# Native traj + topology
+df = detect_hbonds("rep.xtc", top="system.pdb", backbone_only=True)
 
 hbonds_df, occ_df = detect_hbonds_with_occupancy(
     "trajectory.pdb",
     sub_frames=100,
-    backbone_only=False,
+    backbone_only=True,
     output_csv_path="hbond_occupancy.csv",
 )
 ```
@@ -169,6 +221,7 @@ sim = simulation_set_from_dir(
     frame_dt_ps=1000,
     start_ps=1000,
     end_ps=500000,
+    backbone_only=True,  # default
 ).run()
 
 # Two class dirs (e.g., WT vs MUT), each containing replicate subdirs
