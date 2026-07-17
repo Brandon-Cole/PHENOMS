@@ -66,6 +66,13 @@ from phenoms.qc import (
     assess_series_convergence,
     rmsd_convergence_report,
 )
+from phenoms.preprocess import (
+    ReplicateInput,
+    detect_replicate_input,
+    discover_replicate_dirs,
+    normalize_replicate_to_pdb,
+    prepare_set_from_dir,
+)
 
 __all__ = [
     "SimulationSet",
@@ -113,6 +120,13 @@ __all__ = [
     "check_mdp_key_consistency",
     "assess_series_convergence",
     "rmsd_convergence_report",
+    "ReplicateInput",
+    "detect_replicate_input",
+    "discover_replicate_dirs",
+    "normalize_replicate_to_pdb",
+    "prepare_set_from_dir",
+    "simulation_set_from_dir",
+    "comparison_sets_from_dirs",
 ]
 
 __version__ = "0.1.0"
@@ -237,3 +251,100 @@ def detect_hbonds_with_occupancy(
     if output_csv_path is not None:
         occupancy_df.to_csv(output_csv_path, index=False)
     return hbonds_df, occupancy_df
+
+
+def simulation_set_from_dir(
+    input_dir,
+    prepared_dir,
+    *,
+    resid_range=None,
+    sub_frames=None,
+    bond_statistics_threshold=None,
+    output_dir=None,
+    frame_dt_ps=1000.0,
+    start_ps=None,
+    end_ps=None,
+    apply_imaging=True,
+    center=True,
+    fit=True,
+):
+    """
+    Build a SimulationSet from a replicate directory or set directory.
+
+    `input_dir` can be:
+    - one replicate directory (contains files for one sim), or
+    - one set directory containing replicate subdirectories.
+    """
+    pdb_files = prepare_set_from_dir(
+        input_dir,
+        prepared_dir,
+        frame_dt_ps=frame_dt_ps,
+        start_ps=start_ps,
+        end_ps=end_ps,
+        apply_imaging=apply_imaging,
+        center=center,
+        fit=fit,
+    )
+    return SimulationSet(
+        pdb_files=pdb_files,
+        resid_range=resid_range,
+        sub_frames=sub_frames,
+        bond_statistics_threshold=bond_statistics_threshold,
+        output_dir=output_dir,
+    )
+
+
+def comparison_sets_from_dirs(
+    dir_a,
+    dir_b,
+    prepared_dir_a,
+    prepared_dir_b,
+    *,
+    resid_range=None,
+    sub_frames=None,
+    bond_statistics_threshold=None,
+    output_dir_a=None,
+    output_dir_b=None,
+    frame_dt_ps=1000.0,
+    start_ps=None,
+    end_ps=None,
+    apply_imaging=True,
+    center=True,
+    fit=True,
+    label_a="set_a",
+    label_b="set_b",
+):
+    """
+    Build two SimulationSet objects from two class directories (e.g., WT and MUT).
+
+    Returns (set_a, set_b, comparison_set).
+    """
+    set_a = simulation_set_from_dir(
+        dir_a,
+        prepared_dir_a,
+        resid_range=resid_range,
+        sub_frames=sub_frames,
+        bond_statistics_threshold=bond_statistics_threshold,
+        output_dir=output_dir_a,
+        frame_dt_ps=frame_dt_ps,
+        start_ps=start_ps,
+        end_ps=end_ps,
+        apply_imaging=apply_imaging,
+        center=center,
+        fit=fit,
+    )
+    set_b = simulation_set_from_dir(
+        dir_b,
+        prepared_dir_b,
+        resid_range=resid_range,
+        sub_frames=sub_frames,
+        bond_statistics_threshold=bond_statistics_threshold,
+        output_dir=output_dir_b,
+        frame_dt_ps=frame_dt_ps,
+        start_ps=start_ps,
+        end_ps=end_ps,
+        apply_imaging=apply_imaging,
+        center=center,
+        fit=fit,
+    )
+    return set_a, set_b, ComparisonSet(set_a, set_b, label_a=label_a, label_b=label_b)

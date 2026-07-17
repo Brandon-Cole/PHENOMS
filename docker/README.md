@@ -50,6 +50,32 @@ docker run --cpus=4 --rm \
   python scripts/benchmark_kernel.py --sub-frames 250 --out-dir /out --rust-threads 4 --mda-workers 4
 ```
 
+## PLCg2 truncation benchmark (preprocessed trajectory)
+
+Runs on PLCg2 AMBER inputs in `plcg2_data/` with preprocessing
+(protein-only, imaged, centered, fitted), then benchmarks 10 windows by default:
+`Full`, `Trunc1_1_1077`, `Trunc2_1_977`, ...
+
+```bash
+./scripts/run_benchmark_plcg2_docker.sh
+```
+
+Default run parameters:
+- `--sub-frames 500`
+- `--n-windows 10`
+- `--truncation-step 100`
+- `--rust-threads 4`
+- `--mda-workers 4`
+
+Preprocess on host first (recommended when Docker memory is tight), then benchmark
+in container from the preprocessed PDB:
+
+```bash
+python scripts/preprocess_plcg2_for_benchmark.py --sub-frames 500
+export PHENOMS_PLCG2_PREP_PDB="$(pwd)/phenom_outputs/benchmarks/plcg2_preprocessed/plcg2_preprocessed_500f.pdb"
+./scripts/run_benchmark_plcg2_docker.sh
+```
+
 - **`--cpus=4`**: hard CPU cap for the container (change as needed).  
 - **Image `ENV`**: `OMP_NUM_THREADS=4`, `OPENBLAS_NUM_THREADS=4`, etc.  
 - **Script**: also applies the same thread defaults before importing NumPy / MDTraj / MDAnalysis.

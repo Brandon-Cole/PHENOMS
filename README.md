@@ -154,6 +154,42 @@ python scripts/renumber_many_to_reference.py \
   --output-dir ./exports_renumbered
 ```
 
+### Engine-agnostic input prep (GROMACS/OpenMM/AMBER)
+
+PHENOMS now includes directory-based input preparation helpers that enforce
+required files per replicate and export normalized multi-frame PDBs:
+
+```python
+from phenoms import simulation_set_from_dir, comparison_sets_from_dirs
+
+# One set from a replicate dir or a dir-of-replicate-dirs
+sim = simulation_set_from_dir(
+    input_dir="./wt_set",
+    prepared_dir="./prepared/wt",
+    frame_dt_ps=1000,
+    start_ps=1000,
+    end_ps=500000,
+).run()
+
+# Two class dirs (e.g., WT vs MUT), each containing replicate subdirs
+set_a, set_b, comp = comparison_sets_from_dirs(
+    dir_a="./wt_set",
+    dir_b="./mut_set",
+    prepared_dir_a="./prepared/wt",
+    prepared_dir_b="./prepared/mut",
+    label_a="wt",
+    label_b="mut",
+)
+set_a.run()
+set_b.run()
+comp.compare()
+```
+
+Required files per replicate directory:
+- GROMACS: trajectory `.xtc`/`.trr` + topology `.tpr` (preferred) or `.gro`/`.pdb`
+- OpenMM: trajectory `.dcd`/`.xtc` + topology `.pdb`/`.prmtop`
+- AMBER: trajectory `.nc`/`.mdcrd` + topology `.prmtop`/`.parm7`
+
 ## Outputs & benchmarks
 
 ### Core analysis outputs

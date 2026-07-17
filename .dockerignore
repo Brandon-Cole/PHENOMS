@@ -13,3 +13,14 @@ H_bond_work/
 .vscode/
 .cursor/
 **/.ipynb_checkpoints
+phenom_outputs/
+protein_pdb_exports/
+plcg2_data/
+paper_materials/
+H_bond_work/
+target/
+*.ai
+*.tif
+*.pdf
+*.docx
+*.pse

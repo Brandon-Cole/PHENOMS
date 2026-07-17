@@ -24,11 +24,15 @@ phenoms/test_data/
 phenoms/test_outputs/
 phenom_outputs/
 
-# Non-package project/work-in-progress docs
+# Paper / manuscript materials (local only)
+paper_materials/
+
+# Local heavy trajectory / topology data
+plcg2_data/
+
+# Non-package project/work-in-progress
 H_bond_work/
 old_scripts/
-methods.md
-overview_fig_caption.md
 
 # Local editor/project state
 .vscode/
