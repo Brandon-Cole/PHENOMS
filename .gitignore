@@ -43,3 +43,6 @@ protein_pdb_exports/
 
 *.svg
 *.cdxml
+
+# Sphinx
+docs/_build/

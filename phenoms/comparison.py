@@ -131,7 +131,7 @@ def differentially_protected(
     *,
     difference_column: str = "Difference_clipped",
 ):
-    """Filter to rows where |difference_column| > threshold (default: clipped difference)."""
+    """Filter to rows where abs(difference_column) > threshold (default: clipped difference)."""
     col = difference_column
     if col not in comparison_df.columns:
         col = "Difference"

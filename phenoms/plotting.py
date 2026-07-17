@@ -210,7 +210,7 @@ def plot_aggregated_heatmap(
 
 def suggest_difference_threshold_autocorr(comparison_df, y_column="Difference_clipped", kappa=1.96):
     """
-    Estimate a |difference| threshold from sequence structure (lag-1 autocorrelation).
+    Estimate an absolute-difference threshold from sequence structure (lag-1 autocorrelation).
 
     Treats the per-residue difference series (in table order) as roughly AR(1); the
     innovation standard deviation scales local noise. Returns
@@ -270,20 +270,20 @@ def plot_difference(
     Parameters
     ----------
     diff_threshold : float or None
-        Used when ``diff_threshold_mode="manual"``: residues with |y| above this get
-        text labels. When imputing, plotted y is set to 0 where |y| < threshold.
+        Used when ``diff_threshold_mode="manual"``: residues with ``abs(y)`` above this get
+        text labels. When imputing, plotted y is set to 0 where ``abs(y)`` < threshold.
         Default is ``0.2`` (20% delta).
     diff_threshold_mode : str
         ``"manual"`` — use ``diff_threshold``.
         ``"autocorr"`` — threshold from :func:`suggest_difference_threshold_autocorr`
         (``diff_threshold`` ignored except if autocorr fails).
     impute_small_differences : bool
-        If True (default), plot values with |y| below the effective threshold as 0
+        If True (default), plot values with ``abs(y)`` below the effective threshold as 0
         (smoothed / noise-suppressed line). If False, plot raw differences; labels
         still use the effective threshold when set.
     show_labels : bool
         If True (default), add red residue-number text for residues with
-        |difference| >= effective threshold.
+        ``abs(difference)`` >= effective threshold.
     interpolate : bool
         If True, draw a dashed smoothed line (visual only) using interpolation.
         This does not change the underlying data or thresholding.

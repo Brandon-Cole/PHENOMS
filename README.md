@@ -284,6 +284,19 @@ Setup: 3 replicate trajectories, first 250 frames per replicate (from 500 ns PDB
 | MDTraj (`baker_hubbard`) | 0.803 | 17.19x |
 | MDAnalysis (`HydrogenBondAnalysis.run`) | 1.126 | 24.12x |
 
+## Documentation
+
+Sphinx docs (Shibuya theme) live in ``docs/``:
+
+```bash
+pip install -e ".[docs]"
+cd docs && make html
+# open _build/html/index.html
+```
+
+GitHub Actions builds the docs on pushes/PRs that touch documentation or package
+code (see ``.github/workflows/docs.yml``) and publishes HTML to GitHub Pages.
+
 ## Contributing
 Contributions welcome; open an issue or PR.
 
