@@ -20,6 +20,7 @@ dependencies:
   - joblib>=1.0
   - scikit-learn>=1.0
   - networkx>=3.0
+  - click>=8.0
   - pip
   - pip:
     - -e .   # install phenoms package in editable mode
