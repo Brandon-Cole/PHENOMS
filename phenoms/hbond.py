@@ -23,6 +23,10 @@ try:
     from phenoms_hbond_rs import run_baker_hubbard_with_threads as _run_baker_hubbard_rs_threads
 except ImportError:
     _run_baker_hubbard_rs_threads = None
+try:
+    from phenoms_hbond_rs import run_baker_hubbard_brute as _run_baker_hubbard_rs_brute
+except ImportError:
+    _run_baker_hubbard_rs_brute = None
 
 import polars as pl
 
