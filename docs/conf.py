@@ -57,7 +57,7 @@ autodoc_mock_imports = [
     "joblib",
     "tqdm",
     "Bio",
-    "phenoms_hbond_rs",
+    "phenoms.phenoms_hbond_rs",
 ]
 
 myst_enable_extensions = [
