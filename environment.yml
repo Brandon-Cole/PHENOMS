@@ -23,9 +23,9 @@ dependencies:
   - click>=8.0
   - pip
   - pip:
-    - -e .   # install phenoms package in editable mode
+    - maturin>=1.7,<2.0   # builds the Rust kernel; requires a Rust toolchain (rustup.rs)
+    - -e .   # install phenoms package in editable mode (builds phenoms.phenoms_hbond_rs via maturin)
     - pytest>=7.0
     - pytest-cov>=4.0
     # optional benchmark dependency (also available via: pip install -e ".[benchmark]")
     - mdanalysis>=2.4
-# Optional Rust: install Rust (rustup.rs), then: pip install maturin && maturin develop

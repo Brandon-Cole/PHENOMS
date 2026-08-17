@@ -16,13 +16,17 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 
 try:
-    from phenoms_hbond_rs import run_baker_hubbard as _run_baker_hubbard_rs
+    from phenoms.phenoms_hbond_rs import run_baker_hubbard as _run_baker_hubbard_rs
 except ImportError:
     _run_baker_hubbard_rs = None
 try:
-    from phenoms_hbond_rs import run_baker_hubbard_with_threads as _run_baker_hubbard_rs_threads
+    from phenoms.phenoms_hbond_rs import run_baker_hubbard_with_threads as _run_baker_hubbard_rs_threads
 except ImportError:
     _run_baker_hubbard_rs_threads = None
+try:
+    from phenoms.phenoms_hbond_rs import run_baker_hubbard_brute as _run_baker_hubbard_rs_brute
+except ImportError:
+    _run_baker_hubbard_rs_brute = None
 
 import polars as pl
 

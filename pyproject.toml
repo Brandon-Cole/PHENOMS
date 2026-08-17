@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
 
 [project]
 name = "phenoms"
@@ -9,13 +9,14 @@ description = "Backbone H-bond network analysis for MD simulations (HDX-MS style
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.8"
-authors = [{ name = "PHENOMS" }]
+authors = [{ name = "Brandon Novy", email = "bcnovy96@gmail.com" }]
 keywords = ["molecular-dynamics", "hydrogen-bonds", "HDX-MS", "backbone"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Rust",
 ]
 dependencies = [
     "mdtraj>=1.9",
@@ -44,9 +45,12 @@ docs = [
 [project.scripts]
 phenoms = "phenoms.cli:main"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["phenoms*"]
+[tool.maturin]
+module-name = "phenoms.phenoms_hbond_rs"
+python-source = "."
+manifest-path = "Cargo.toml"
+features = ["pyo3/extension-module"]
+exclude = [".DS_Store", "**/.DS_Store", "**/__pycache__/**", "**/*.pyc"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

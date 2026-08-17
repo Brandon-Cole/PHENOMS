@@ -15,6 +15,10 @@ pip-wheel-metadata/
 
 # Rust extension build artifacts
 target/
+# Compiled extension from `maturin develop` (lands inside phenoms/ in editable installs)
+phenoms/*.so
+phenoms/*.pyd
+phenoms/*.dll
 
 # Conda build artifacts
 condaenv.*.requirements.txt
@@ -46,3 +50,6 @@ protein_pdb_exports/
 
 # Sphinx
 docs/_build/
+
+# Local scratch / publication notes
+for_publication_*.txt

@@ -40,14 +40,18 @@ def create_pivot_table(hbonds_df, bond_labels_sorted):
     -------
     pd.DataFrame
     """
-    hbonds_pivot = hbonds_df.pivot_table(
-        index="Bond Label",
-        columns="Frame",
-        aggfunc="size",
-        fill_value=0,
+    if hbonds_df is None or hbonds_df.empty:
+        return pd.DataFrame(
+            index=bond_labels_sorted,
+            columns=[],
+            dtype=int,
+        )
+    counts = (
+        hbonds_df.groupby(["Bond Label", "Frame"], observed=True)
+        .size()
+        .unstack(fill_value=0)
     )
-    hbonds_pivot = hbonds_pivot.reindex(bond_labels_sorted, fill_value=0)
-    return hbonds_pivot
+    return counts.reindex(bond_labels_sorted, fill_value=0)
 
 
 def _average_bond_lifetime(row):

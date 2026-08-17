@@ -10,17 +10,17 @@ PHENOMS analyzes backbone H-bond networks from MD trajectories for HDX-MS–styl
 
 ## Install
 
+Install [Rust](https://rustup.rs/) first, then:
+
 ```bash
 conda env create -f environment.yml
 conda activate phenoms
 pip install -e .
 ```
 
-Rust kernel (recommended):
-
-```bash
-pip install maturin && maturin develop --release
-```
+`pip install -e .` builds the Rust kernel (`phenoms.phenoms_hbond_rs`) into the
+same package via [maturin](https://www.maturin.rs/). Without a Rust toolchain
+at install time, PHENOMS falls back to MDTraj for detection.
 
 ## Quick start
 

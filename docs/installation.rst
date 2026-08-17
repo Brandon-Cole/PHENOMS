@@ -4,27 +4,24 @@ Installation
 Conda environment
 -----------------
 
+Install `Rust <https://rustup.rs/>`_ first — the build is driven by
+`maturin <https://www.maturin.rs/>`_, which compiles the Rust geometry kernel
+(``phenoms.phenoms_hbond_rs``) into the same wheel as the Python package.
+
 .. code-block:: bash
 
    conda env create -f environment.yml
    conda activate phenoms
    pip install -e .
 
-The editable install registers the ``phenoms`` CLI entry point.
+The editable install builds the Rust extension and registers the ``phenoms``
+CLI entry point in one step. Detection uses the Rust geometry kernel when it's
+built; **Polars** speeds occupancy aggregation only (not the Baker–Hubbard
+kernel itself). Without a Rust toolchain at install time, PHENOMS falls back
+to MDTraj for detection.
 
-Rust extension (recommended)
-----------------------------
-
-Install `Rust <https://rustup.rs/>`_, then from the repo root:
-
-.. code-block:: bash
-
-   pip install maturin
-   maturin develop --release
-
-This builds ``phenoms_hbond_rs``. Detection uses the Rust geometry kernel when
-available; **Polars** speeds occupancy aggregation only (not the Baker–Hubbard
-kernel itself). Without Rust, PHENOMS falls back to MDTraj.
+For local iteration on the Rust source, ``maturin develop --release`` from the
+repo root rebuilds just the extension without reinstalling dependencies.
 
 Optional extras
 ---------------
