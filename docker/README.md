@@ -2,6 +2,8 @@
 
 This is **not** part of the published Python wheel; it lives in the GitHub repo so anyone can reproduce the containerized benchmark. Default helper settings run with a **4 CPU** cgroup cap and 4-thread library defaults.
 
+**Platform note:** the Rust-vs-MDTraj comparison is thread-based and reproduces consistently across OSes. The MDAnalysis comparison uses `HydrogenBondAnalysis(..., backend="multiprocessing")`, whose per-call startup cost depends on the OS process-start method (cheap `fork` on Linux vs. expensive `spawn` on macOS/Windows) — running the same script outside this Linux container will very likely show a *larger* (not smaller) speedup over MDAnalysis than the numbers reported here, purely from that platform difference rather than any change in the underlying kernels.
+
 ## What it measures
 
 Same script as a local run: **`scripts/benchmark_kernel.py`** — Rust `run_baker_hubbard`, one MDTraj `baker_hubbard` call per replicate, MDAnalysis `HydrogenBondAnalysis.run` on the same first *N* frames. After the run, open **`BENCHMARK_README.txt`** in the output folder for semantics of the three paths (they are not identical chemistry definitions).

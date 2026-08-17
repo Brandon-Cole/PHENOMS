@@ -8,25 +8,34 @@ for a reproducible **1 CPU** Docker run.
 
 Three-way timing on the **same** first-``N`` frames for each replicate PDB:
 
-1. **Rust** — ``run_baker_hubbard`` (single-thread): raw (frame, donor, H, acceptor) hits,
-   same geometry as MDTraj Baker–Hubbard (0.25 nm H···A, 120° at H).
+1. **Rust** — ``run_baker_hubbard`` (``--rust-threads 1``) or the Rayon-parallel
+   ``run_baker_hubbard_with_threads`` (``--rust-threads`` > 1, default: **4**): raw
+   (frame, donor, H, acceptor) hits, same geometry as MDTraj Baker–Hubbard
+   (0.25 nm H···A, 120° at H).
 
 2. **MDTraj** — **docs-style** single call: ``md.baker_hubbard(traj_n, periodic=False)``
    on ``traj_n = traj[:N]`` (defaults: ``freq=0.1``, ``exclude_water=True``, …).
    Returned rows are **persistent** (d,h,a) triplets, not the same statistic as Rust.
+   MDTraj's public API has no multi-threading option, so this is necessarily a
+   single-threaded call regardless of ``--rust-threads``.
 
-3. **MDAnalysis** — **docs-style** ``HydrogenBondAnalysis``: PDBs without bond/charge
-   data use explicit ``donors_sel`` / ``hydrogens_sel`` / ``acceptors_sel`` and
-   ``d_h_cutoff`` per MDAnalysis guidance. Criteria differ from Baker–Hubbard
-   (e.g. default HBA angle / D–A cutoff); timings are **API representative**, not
-   matched-geometry kernels.
+3. **MDAnalysis** — **docs-style** ``HydrogenBondAnalysis`` run with
+   ``backend="multiprocessing"`` and ``n_workers`` = ``--mda-workers`` (default: 4).
+   PDBs without bond/charge data use explicit ``donors_sel`` / ``hydrogens_sel`` /
+   ``acceptors_sel`` and ``d_h_cutoff`` per MDAnalysis guidance. Criteria differ from
+   Baker–Hubbard (e.g. default HBA angle / D–A cutoff); timings are **API
+   representative**, not matched-geometry kernels. CAUTION: the multiprocessing
+   backend's per-call startup cost depends on the OS process-start method (cheap
+   ``fork`` on Linux vs. expensive ``spawn`` on macOS/Windows), so the *magnitude* of
+   the MDAnalysis comparison is not portable across platforms the way the Rust-vs-
+   MDTraj comparison is — expect much larger (not smaller) speedup multipliers on
+   macOS/Windows than on the Linux/Docker reference numbers.
 
 Threading: before importing NumPy / MDAnalysis / MDTraj, this script sets standard
 OpenMP/BLAS thread caps to **4** (via ``os.environ.setdefault``). Override by
-exporting variables **before** launching the script.
-
-Rust remains explicitly single-threaded (``run_baker_hubbard``, not the Rayon
-variant).
+exporting variables **before** launching the script. This controls BLAS/OpenMP
+threading inside MDTraj/MDAnalysis/NumPy, not the Rust kernel's own thread count,
+which is set independently via ``--rust-threads``.
 """
 
 from __future__ import annotations
@@ -83,24 +92,36 @@ def _default_replicates(data_dir: Path) -> list[Path]:
     ]
 
 
-def _write_benchmark_readme(out_dir: Path, *, n_frames: int) -> None:
+def _write_benchmark_readme(
+    out_dir: Path, *, n_frames: int, rust_threads: int, mda_workers: int, thread_env: dict
+) -> None:
+    rust_desc = (
+        "Single-thread ``run_baker_hubbard``."
+        if rust_threads <= 1
+        else f"Rayon-parallel ``run_baker_hubbard_with_threads`` with {rust_threads} threads."
+    )
+    env_desc = ", ".join(f"{k}={v}" for k, v in thread_env.items() if v is not None) or "(unset)"
     text = f"""Benchmark: kernel / API timing (replicates × first {n_frames} frames)
 
 Rust
-  Single-thread ``run_baker_hubbard``. Count = rows in output (one per geometric hit).
+  {rust_desc} Count = rows in output (one per geometric hit).
 
 MDTraj
   One call per replicate: ``md.baker_hubbard(traj[:{n_frames}], periodic=False)``
   (other arguments left at **library defaults**, including ``freq=0.1`` and
   ``exclude_water=True``). Count = number of returned (donor, H, acceptor) triplets.
+  MDTraj's public API has no multi-threading option, regardless of --rust-threads.
 
 MDAnalysis
   ``HydrogenBondAnalysis`` with explicit selections for bondless/chargeless PDB
-  inputs (protein N/H and O/N acceptors, ``d_h_cutoff=1.2`` Å). Count = rows in
+  inputs (protein N/H and O/N acceptors, ``d_h_cutoff=1.2`` Å), run with
+  ``backend="multiprocessing"``, ``n_workers={mda_workers}``. Count = rows in
   ``results.hbonds``. Default HBA distance/angle cutoffs apply unless changed in code.
+  CAUTION: multiprocessing startup cost (fork vs. spawn) is platform-dependent, so
+  this comparison's magnitude does not port across OSes the way Rust-vs-MDTraj does.
 
-Thread env (setdefault before imports): OMP_NUM_THREADS, OPENBLAS_NUM_THREADS,
-MKL_NUM_THREADS, NUMEXPR_NUM_THREADS, VECLIB_MAXIMUM_THREADS → 1
+BLAS/OpenMP thread env (setdefault before imports, applies to MDTraj/MDAnalysis/
+NumPy, not the Rust kernel): {env_desc}
 
 Docker (1 CPU): see docker/README.md in the repository.
 """
@@ -269,7 +290,13 @@ def main() -> int:
 
     summary_path = out_dir / "kernel_summary.csv"
     summary.to_csv(summary_path, index=False)
-    _write_benchmark_readme(out_dir, n_frames=n_cap if not per_rep.empty else n_cap)
+    _write_benchmark_readme(
+        out_dir,
+        n_frames=n_cap,
+        rust_threads=int(args.rust_threads),
+        mda_workers=int(args.mda_workers),
+        thread_env=meta["thread_env"],
+    )
 
     print(f"Kernel benchmark CSV: {per_path}")
     print(f"Kernel summary CSV:   {summary_path}")
