@@ -1,5 +1,5 @@
-Outputs & benchmarks
-====================
+Outputs
+=======
 
 Core analysis outputs
 ---------------------
@@ -32,24 +32,3 @@ Default location
 
 ``./phenom_outputs/`` or ``$PHENOMS_OUTPUT_DIR``. Prefer explicit ``output_dir`` /
 ``--output-dir`` for project-organized runs.
-
-Kernel benchmarks
------------------
-
-Local:
-
-.. code-block:: bash
-
-   python scripts/benchmark_kernel.py --sub-frames 250
-
-Docker reproduction: see ``docker/README.md`` in the repository.
-
-Reference (4-CPU Docker, 3 replicates × 250 frames, 2,722 atoms each):
-
-======= ============================ ============
-Method  Total time (s)               Rust speedup
-======= ============================ ============
-Rust    0.047                        1.00×
-MDTraj  0.803                        17.19×
-MDA     1.126                        24.12×
-======= ============================ ============

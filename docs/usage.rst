@@ -1,6 +1,23 @@
 Usage
 =====
 
+Inputs
+------
+
+PHENOMS accepts three input shapes; pick whichever matches what you already have:
+
+* **Multi-frame PDBs** — one PDB per replicate, already protein-centered/fitted.
+  Simplest and recommended when available (see "Simple form" below).
+* **Native trajectory + topology** — engine-native trajectories (``.xtc``, ``.trr``,
+  ``.dcd``, ``.nc``, …) loaded directly with a shared or per-replicate topology
+  (``.pdb``, ``.gro``, ``.tpr``, ``.prmtop``, …). No intermediate files written.
+* **Engine folders (GROMACS / OpenMM / AMBER)** — point at raw simulation output
+  directories; PHENOMS discovers the trajectory/topology pair per replicate,
+  applies PBC imaging/centering/fitting, and produces normalized PDBs for you.
+
+All three end up feeding :class:`~phenoms.SimulationSet`; see the matching
+sections below for code.
+
 Output location
 ---------------
 
@@ -50,17 +67,20 @@ One-shot helper:
 Native trajectories
 -------------------
 
-Load engine-native files without writing intermediate PDBs:
+Load engine-native files without writing intermediate PDBs. ``output_dir`` is
+optional but required if you want anything written to disk — without it,
+``.run()`` only populates the in-memory result (``sim.get_pivot_tables()``, etc.):
 
 .. code-block:: python
 
-   from phenoms import SimulationSet
+   from phenoms import SimulationSet, default_output_root
 
    sim = SimulationSet.from_trajectories(
        ["rep1.xtc", "rep2.xtc"],
-       topology="system.pdb",          # or topologies=[...]
+       topology="system.pdb",          # or topologies=[...]; .gro/.tpr/.prmtop also work
        sub_frames=200,
        backbone_only=True,
+       output_dir=default_output_root() / "my_run",
    )
    sim.run()
 
@@ -71,7 +91,12 @@ Equivalent constructor form:
    SimulationSet(
        trajectories=["rep1.xtc", "rep2.xtc"],
        topology="system.pdb",
+       output_dir=default_output_root() / "my_run",
    )
+
+GROMACS ``.tpr`` topologies are read via the optional `MDAnalysis
+<https://www.mdanalysis.org/>`_ dependency (``pip install "phenoms[gromacs]"``);
+without it, supply a ``.gro``/``.pdb`` topology instead.
 
 For PBC imaging / centering / fitting first, use
 :func:`phenoms.prepare_set_from_dir` or ``phenoms prep``.
@@ -139,7 +164,8 @@ PDBs, then return ready ``SimulationSet`` objects:
 
 Required files per replicate directory:
 
-* **GROMACS**: ``.xtc``/``.trr`` + topology ``.tpr`` (preferred) or ``.gro``/``.pdb``
+* **GROMACS**: ``.xtc``/``.trr`` + topology ``.tpr`` (preferred, needs ``phenoms[gromacs]``)
+  or ``.gro``/``.pdb``
 * **OpenMM**: ``.dcd``/``.xtc`` + ``.pdb``/``.prmtop``
 * **AMBER**: ``.nc``/``.mdcrd`` + ``.prmtop``/``.parm7``
 
