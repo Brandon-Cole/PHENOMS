@@ -13,6 +13,7 @@ from typing import Iterable
 
 import mdtraj as md
 
+from phenoms.io import tpr_to_mdtraj_topology
 
 _TRAJ_EXTS = {".xtc", ".trr", ".dcd", ".nc", ".mdcrd", ".pdb"}
 
@@ -45,7 +46,10 @@ def detect_replicate_input(replicate_dir: str | Path) -> ReplicateInput:
     Detect simulation engine and enforce required files for one replicate folder.
 
     Required files:
-    - gromacs: trajectory (.xtc/.trr) + topology (.tpr preferred, else .gro/.pdb)
+
+    - gromacs: trajectory (.xtc/.trr) + topology (.tpr preferred, else .gro/.pdb).
+      Reading .tpr requires the optional MDAnalysis dependency (``pip install
+      "phenoms[gromacs]"``); without it, use a .gro/.pdb topology instead.
     - openmm: trajectory (.dcd/.xtc) + topology (.pdb/.prmtop)
     - amber: trajectory (.nc/.mdcrd) + topology (.prmtop/.parm7)
     - pdb: one multi-model .pdb trajectory (already normalized input)
@@ -129,6 +133,14 @@ def discover_replicate_dirs(input_dir: str | Path) -> list[Path]:
 def _load_rep(rep: ReplicateInput):
     if rep.topology_path is None:
         return md.load(str(rep.trajectory_path))
+
+    if rep.topology_path.suffix.lower() == ".tpr":
+        converted = tpr_to_mdtraj_topology(rep.topology_path)
+        try:
+            return md.load(str(rep.trajectory_path), top=str(converted))
+        finally:
+            converted.unlink(missing_ok=True)
+
     return md.load(str(rep.trajectory_path), top=str(rep.topology_path))
 
 
