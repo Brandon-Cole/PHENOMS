@@ -22,13 +22,16 @@ _TPR_HELP = (
 )
 
 
-def tpr_to_mdtraj_topology(tpr_path) -> Path:
+def tpr_to_mdtraj_topology(tpr_path, traj_path) -> Path:
     """
     Convert a GROMACS .tpr into a throwaway PDB that MDTraj can use as a topology.
 
     Uses MDAnalysis's pure-Python .tpr parser (no GROMACS binary required) to read
-    atoms/bonds/resids, then writes them out as PDB. Caller is responsible for
-    deleting the returned path.
+    atoms/bonds/resids. The trajectory is loaded alongside it purely so MDAnalysis
+    has a coordinate set to write out (whether a bare .tpr carries usable
+    coordinates on its own varies by MDAnalysis version); the actual frame data
+    used for analysis always comes from ``traj_path`` via MDTraj afterward.
+    Caller is responsible for deleting the returned path.
     """
     tpr_path = Path(tpr_path)
     try:
@@ -38,7 +41,7 @@ def tpr_to_mdtraj_topology(tpr_path) -> Path:
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        universe = mda.Universe(str(tpr_path))
+        universe = mda.Universe(str(tpr_path), str(traj_path))
         tmp = tempfile.NamedTemporaryFile(suffix=".pdb", delete=False)
         tmp.close()
         universe.atoms.write(tmp.name)
@@ -68,7 +71,7 @@ def load_trajectory(path, top=None):
 
     top = Path(top)
     if top.suffix.lower() == ".tpr":
-        converted = tpr_to_mdtraj_topology(top)
+        converted = tpr_to_mdtraj_topology(top, path)
         try:
             return md.load(path, top=str(converted))
         finally:

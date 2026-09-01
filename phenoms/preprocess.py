@@ -135,7 +135,7 @@ def _load_rep(rep: ReplicateInput):
         return md.load(str(rep.trajectory_path))
 
     if rep.topology_path.suffix.lower() == ".tpr":
-        converted = tpr_to_mdtraj_topology(rep.topology_path)
+        converted = tpr_to_mdtraj_topology(rep.topology_path, rep.trajectory_path)
         try:
             return md.load(str(rep.trajectory_path), top=str(converted))
         finally:
