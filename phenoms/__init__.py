@@ -133,7 +133,12 @@ __all__ = [
     "prepare_set_from_dir",
 ]
 
-__version__ = "0.2.0"
+try:
+    from importlib.metadata import PackageNotFoundError, version as _pkg_version
+
+    __version__ = _pkg_version("phenoms")
+except PackageNotFoundError:
+    __version__ = "0.0.0+unknown"
 
 
 def run_backbone_hbond_analysis(
