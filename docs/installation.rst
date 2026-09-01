@@ -23,11 +23,21 @@ to MDTraj for detection.
 For local iteration on the Rust source, ``maturin develop --release`` from the
 repo root rebuilds just the extension without reinstalling dependencies.
 
+Using uv
+--------
+
+.. code-block:: bash
+
+   uv venv
+   source .venv/bin/activate
+   uv pip install -e .
+
 Optional extras
 ---------------
 
 .. code-block:: bash
 
+   pip install -e ".[gromacs]"     # MDAnalysis to read GROMACS .tpr topologies
    pip install -e ".[benchmark]"   # MDAnalysis for kernel benchmarks
    pip install -e ".[structure]"   # BioPython for PDB B-factor writes
 

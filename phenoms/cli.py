@@ -34,11 +34,28 @@ def main():
 
 
 @main.command("prep")
-@click.option("--input-dir", required=True, type=click.Path(exists=True, file_okay=False))
-@click.option("--prepared-dir", required=True, type=click.Path(file_okay=False))
-@click.option("--frame-dt-ps", default=1000.0, show_default=True, type=float)
-@click.option("--start-ps", default=None, type=float)
-@click.option("--end-ps", default=None, type=float)
+@click.option(
+    "--input-dir",
+    required=True,
+    type=click.Path(exists=True, file_okay=False),
+    help="Set directory: one replicate folder, or a folder of replicate subfolders "
+    "(GROMACS/OpenMM/AMBER files, e.g. .xtc+.tpr, .dcd+.pdb, .nc+.prmtop).",
+)
+@click.option(
+    "--prepared-dir",
+    required=True,
+    type=click.Path(file_okay=False),
+    help="Output directory for normalized multi-frame PDBs, one per replicate.",
+)
+@click.option(
+    "--frame-dt-ps",
+    default=1000.0,
+    show_default=True,
+    type=float,
+    help="Minimum spacing between kept frames, in picoseconds.",
+)
+@click.option("--start-ps", default=None, type=float, help="Discard frames before this time (ps).")
+@click.option("--end-ps", default=None, type=float, help="Discard frames after this time (ps).")
 @click.option("--no-imaging", is_flag=True, help="Skip best-effort PBC imaging.")
 @click.option("--no-center", is_flag=True, help="Skip centering.")
 @click.option("--no-fit", is_flag=True, help="Skip fitting/superposition.")
@@ -60,16 +77,69 @@ def prep_cmd(input_dir, prepared_dir, frame_dt_ps, start_ps, end_ps, no_imaging,
 
 
 @main.command("run")
-@click.option("--pdb", "pdb_files", multiple=True, type=click.Path(exists=True, dir_okay=False))
-@click.option("--traj", "trajectories", multiple=True, type=click.Path(exists=True, dir_okay=False))
-@click.option("--topology", default=None, type=click.Path(exists=True, dir_okay=False))
-@click.option("--topology-each", "topologies", multiple=True, type=click.Path(exists=True, dir_okay=False))
-@click.option("--output-dir", default=None, type=click.Path(file_okay=False))
-@click.option("--sub-frames", default=None, type=int)
-@click.option("--resid-range", nargs=2, type=int, default=None)
+@click.option(
+    "--pdb",
+    "pdb_files",
+    multiple=True,
+    type=click.Path(exists=True, dir_okay=False),
+    help="Multi-frame PDB replicate (repeatable). Mutually exclusive with --traj.",
+)
+@click.option(
+    "--traj",
+    "trajectories",
+    multiple=True,
+    type=click.Path(exists=True, dir_okay=False),
+    help="Native trajectory replicate, e.g. .xtc/.trr/.dcd/.nc (repeatable). "
+    "Requires --topology or --topology-each. Mutually exclusive with --pdb.",
+)
+@click.option(
+    "--topology",
+    default=None,
+    type=click.Path(exists=True, dir_okay=False),
+    help="Shared topology for all --traj replicates (.pdb/.gro/.tpr/.prmtop/…).",
+)
+@click.option(
+    "--topology-each",
+    "topologies",
+    multiple=True,
+    type=click.Path(exists=True, dir_okay=False),
+    help="Per-replicate topology, one per --traj, in the same order (repeatable).",
+)
+@click.option(
+    "--output-dir",
+    default=None,
+    type=click.Path(file_okay=False),
+    help="Where to write artifacts. Defaults to $PHENOMS_OUTPUT_DIR/cli_run "
+    "(or ./phenom_outputs/cli_run).",
+)
+@click.option(
+    "--sub-frames",
+    default=None,
+    type=int,
+    help="Number of frames to analyze per replicate. Omit to use the whole trajectory.",
+)
+@click.option(
+    "--resid-range",
+    nargs=2,
+    type=int,
+    default=None,
+    help="START END residue numbers to filter heatmaps/plots (1-based). Detection still runs "
+    "on the whole protein.",
+)
 @click.option("--all-bonds", is_flag=True, help="Detect all H-bonds (default is backbone N-O only).")
-@click.option("--bond-statistics-threshold", default=None, type=float)
-@click.option("--n-jobs", default=None, type=int)
+@click.option(
+    "--bond-statistics-threshold",
+    default=None,
+    type=float,
+    help="If set, compute bond lifetime/break-frequency statistics at this occupancy threshold.",
+)
+@click.option(
+    "--n-jobs",
+    default=None,
+    type=int,
+    help="MDTraj parallel workers per replicate (ignored on the Rust path). "
+    "Defaults to all CPUs minus two.",
+)
 @click.option("--no-rust", is_flag=True, help="Force MDTraj fallback.")
 @click.option("--qc", is_flag=True, help="Enable RMSD QC (fail-fast on nonconvergence).")
 def run_cmd(
@@ -123,18 +193,68 @@ def run_cmd(
 
 
 @main.command("compare")
-@click.option("--dir-a", required=True, type=click.Path(exists=True, file_okay=False))
-@click.option("--dir-b", required=True, type=click.Path(exists=True, file_okay=False))
-@click.option("--prepared-dir-a", required=True, type=click.Path(file_okay=False))
-@click.option("--prepared-dir-b", required=True, type=click.Path(file_okay=False))
-@click.option("--output-dir", default=None, type=click.Path(file_okay=False))
-@click.option("--label-a", default="set_a", show_default=True)
-@click.option("--label-b", default="set_b", show_default=True)
-@click.option("--sub-frames", default=None, type=int)
-@click.option("--resid-range", nargs=2, type=int, default=None)
-@click.option("--frame-dt-ps", default=1000.0, show_default=True, type=float)
+@click.option(
+    "--dir-a",
+    required=True,
+    type=click.Path(exists=True, file_okay=False),
+    help="Set A directory (replicate folder or folder of replicate subfolders).",
+)
+@click.option(
+    "--dir-b",
+    required=True,
+    type=click.Path(exists=True, file_okay=False),
+    help="Set B directory (replicate folder or folder of replicate subfolders).",
+)
+@click.option(
+    "--prepared-dir-a",
+    required=True,
+    type=click.Path(file_okay=False),
+    help="Output directory for set A's normalized multi-frame PDBs.",
+)
+@click.option(
+    "--prepared-dir-b",
+    required=True,
+    type=click.Path(file_okay=False),
+    help="Output directory for set B's normalized multi-frame PDBs.",
+)
+@click.option(
+    "--output-dir",
+    default=None,
+    type=click.Path(file_okay=False),
+    help="Where to write artifacts. Defaults to $PHENOMS_OUTPUT_DIR/cli_compare "
+    "(or ./phenom_outputs/cli_compare).",
+)
+@click.option("--label-a", default="set_a", show_default=True, help="Label for set A in outputs/plots.")
+@click.option("--label-b", default="set_b", show_default=True, help="Label for set B in outputs/plots.")
+@click.option(
+    "--sub-frames",
+    default=None,
+    type=int,
+    help="Number of frames to analyze per replicate. Omit to use the whole trajectory.",
+)
+@click.option(
+    "--resid-range",
+    nargs=2,
+    type=int,
+    default=None,
+    help="START END residue numbers to filter heatmaps/plots (1-based). Detection still runs "
+    "on the whole protein.",
+)
+@click.option(
+    "--frame-dt-ps",
+    default=1000.0,
+    show_default=True,
+    type=float,
+    help="Minimum spacing between kept frames during prep, in picoseconds.",
+)
 @click.option("--all-bonds", is_flag=True, help="Detect all H-bonds (default backbone N-O).")
-@click.option("--n-jobs", default=None, type=int)
+@click.option(
+    "--n-jobs",
+    default=None,
+    type=int,
+    help="MDTraj parallel workers per replicate (ignored on the Rust path). "
+    "Defaults to all CPUs minus two.",
+)
 def compare_cmd(
     dir_a,
     dir_b,

@@ -6,7 +6,7 @@ build-backend = "maturin"
 name = "phenoms"
 version = "0.2.0"
 description = "Backbone H-bond network analysis for MD simulations (HDX-MS style)"
-readme = "README.md"
+readme = "PYPI_README.md"
 license = { text = "MIT" }
 requires-python = ">=3.8"
 authors = [{ name = "Brandon Novy", email = "bcnovy96@gmail.com" }]
@@ -35,6 +35,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "pytest-cov>=4.0"]
 structure = ["biopython>=1.79"]
+gromacs = ["MDAnalysis>=2.4"]
 benchmark = ["MDAnalysis>=2.4"]
 docs = [
     "sphinx>=7.0,<9",

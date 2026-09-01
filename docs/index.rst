@@ -46,4 +46,5 @@ At a glance
    usage
    cli
    outputs
+   benchmarks
    api/index

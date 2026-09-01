@@ -197,7 +197,9 @@ class SimulationSet:
             "backbone_only": self.backbone_only,
         }
 
-        for i, input_path in enumerate(tqdm(self.pdb_files, desc="Replicates", unit="replicate")):
+        replicate_bar = tqdm(self.pdb_files, desc="Replicates", unit="replicate")
+        for i, input_path in enumerate(replicate_bar):
+            replicate_bar.set_postfix_str(Path(input_path).name)
             top = None if self.topologies is None else self.topologies[i]
             trajectory = load_and_select_residues(input_path, resid_range=None, top=top)
             if qc:

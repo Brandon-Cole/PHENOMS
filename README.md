@@ -18,9 +18,21 @@ conda activate phenoms
 pip install -e .
 ```
 
-`pip install -e .` builds the Rust kernel (`phenoms.phenoms_hbond_rs`) into the
-same package via [maturin](https://www.maturin.rs/). Without a Rust toolchain
-at install time, PHENOMS falls back to MDTraj for detection.
+Or with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv venv
+source .venv/bin/activate
+uv pip install -e .
+```
+
+`pip install -e .` (or `uv pip install -e .`) builds the Rust kernel
+(`phenoms.phenoms_hbond_rs`) into the same package via
+[maturin](https://www.maturin.rs/). Without a Rust toolchain at install time,
+PHENOMS falls back to MDTraj for detection.
+
+GROMACS `.tpr` topologies require the optional `MDAnalysis` dependency:
+`pip install -e ".[gromacs]"` (or `uv pip install -e ".[gromacs]"`).
 
 ## Quick start
 
