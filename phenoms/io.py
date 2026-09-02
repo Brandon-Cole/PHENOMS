@@ -48,7 +48,24 @@ def tpr_to_mdtraj_topology(tpr_path, traj_path) -> Path:
     return Path(tmp.name)
 
 
-def load_trajectory(path, top=None):
+def _load_full_or_capped(path, top=None, max_frames=None):
+    """
+    ``md.load`` for the whole file, or ``md.iterload``'s first chunk when
+    ``max_frames`` caps how many frames are actually needed.
+
+    Streaming the first ``max_frames`` frames via ``iterload`` avoids reading
+    (and holding in memory) frames past that point — same effect as
+    ``md.load(...)`` followed by ``traj[:max_frames]``, but without ever
+    materializing the discarded tail, which is what causes OOM on large
+    trajectories when only a frame subset is analyzed (e.g. ``sub_frames``).
+    """
+    if max_frames is None:
+        return md.load(path, top=top) if top is not None else md.load(path)
+    kwargs = {"top": top} if top is not None else {}
+    return next(md.iterload(path, chunk=max_frames, **kwargs))
+
+
+def load_trajectory(path, top=None, max_frames=None):
     """
     Load a trajectory from a PDB or from a native trajectory + topology pair.
 
@@ -60,6 +77,11 @@ def load_trajectory(path, top=None):
         Topology for non-PDB trajectories (``.pdb``, ``.prmtop``, ``.gro``, ``.tpr``, …).
         ``.tpr`` is converted on the fly via MDAnalysis (optional dependency).
         Ignored when ``path`` is already a multi-frame PDB with topology embedded.
+    max_frames : int or None
+        If set, only the first ``max_frames`` frames are read from disk (via
+        ``mdtraj.iterload``) instead of loading the entire trajectory first.
+        Pass the same value you intend to pass as ``sub_frames`` downstream to
+        cut peak memory when a trajectory has far more frames than you need.
 
     Returns
     -------
@@ -67,20 +89,20 @@ def load_trajectory(path, top=None):
     """
     path = str(path)
     if top is None:
-        return md.load(path)
+        return _load_full_or_capped(path, max_frames=max_frames)
 
     top = Path(top)
     if top.suffix.lower() == ".tpr":
         converted = tpr_to_mdtraj_topology(top, path)
         try:
-            return md.load(path, top=str(converted))
+            return _load_full_or_capped(path, top=str(converted), max_frames=max_frames)
         finally:
             converted.unlink(missing_ok=True)
 
-    return md.load(path, top=str(top))
+    return _load_full_or_capped(path, top=str(top), max_frames=max_frames)
 
 
-def load_and_select_residues(path, resid_range=None, top=None):
+def load_and_select_residues(path, resid_range=None, top=None, max_frames=None):
     """
     Load trajectory and optionally select a residue range.
 
@@ -94,13 +116,15 @@ def load_and_select_residues(path, resid_range=None, top=None):
         (start, end) residue numbers (1-based). None = whole protein.
     top : str or path-like or None
         Topology for native trajectory formats.
+    max_frames : int or None
+        See :func:`load_trajectory`.
 
     Returns
     -------
     mdtraj.Trajectory
         Loaded (and optionally sliced) trajectory.
     """
-    trajectory = load_trajectory(path, top=top)
+    trajectory = load_trajectory(path, top=top, max_frames=max_frames)
     if resid_range is None:
         selected_atoms = trajectory.top.select("protein")
     else:

@@ -30,11 +30,11 @@ dependencies = [
     "scikit-learn>=1.0",
     "networkx>=3.0",
     "click>=8.0",
+    "biopython>=1.79",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0", "pytest-cov>=4.0"]
-structure = ["biopython>=1.79"]
 gromacs = ["MDAnalysis>=2.4"]
 benchmark = ["MDAnalysis>=2.4"]
 docs = [
