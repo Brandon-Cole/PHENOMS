@@ -45,10 +45,7 @@ from phenoms.comparison import (
 )
 from phenoms.plotting import plot_difference, suggest_difference_threshold_autocorr
 from phenoms.dimensionality_reduction import run_manifold_suite
-try:
-    from phenoms.structure import write_pdb_bfactors
-except ImportError:
-    write_pdb_bfactors = None
+from phenoms.structure import write_pdb_bfactors
 
 from phenoms.cleanup import (
     RenumberReport,
@@ -206,7 +203,7 @@ def detect_hbonds(
     """
     if n_jobs is None:
         n_jobs = default_n_jobs()
-    traj = load_trajectory(path, top=top)
+    traj = load_trajectory(path, top=top, max_frames=sub_frames)
     if backbone_only:
         return process_frames(
             traj,
