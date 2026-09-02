@@ -39,7 +39,9 @@ Optional extras
 
    pip install -e ".[gromacs]"     # MDAnalysis to read GROMACS .tpr topologies
    pip install -e ".[benchmark]"   # MDAnalysis for kernel benchmarks
-   pip install -e ".[structure]"   # BioPython for PDB B-factor writes
+
+BioPython (PDB B-factor writes via :func:`phenoms.write_pdb_bfactors`) is a
+core dependency and needs no extra.
 
 Verify
 ------

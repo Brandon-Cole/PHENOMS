@@ -3,6 +3,8 @@ Tests for SimulationSet (run, getters, optional bond statistics).
 """
 
 import os
+import mdtraj as md
+import numpy as np
 import pytest
 import pandas as pd
 
@@ -107,6 +109,32 @@ class TestSimulationSet:
         assert len(sim.get_hbond_dfs()) == 1
         pivot = sim.get_pivot_tables()[0]
         assert pivot.shape[0] > 0 and pivot.shape[1] == 100
+
+    def test_qc_sees_full_trajectory_even_when_sub_frames_caps_detection(self, tmp_path):
+        """
+        run(sub_frames=...) streams only the first sub_frames frames off disk for
+        detection (memory optimization), but qc=True must still see every frame —
+        RMSD convergence is meaningless over an artificially truncated series.
+        """
+        base = md.load(MINIMAL_PDB)
+        n_frames = 15
+        rng = np.random.default_rng(0)
+        xyz = np.repeat(base.xyz, n_frames, axis=0).astype(np.float32)
+        xyz += rng.normal(scale=0.001, size=xyz.shape).astype(np.float32)
+        full = md.Trajectory(xyz, base.topology)
+        pdb_path = tmp_path / "rep.pdb"
+        full.save_pdb(str(pdb_path))
+
+        sim = SimulationSet([str(pdb_path)], sub_frames=3)
+        try:
+            sim.run(n_jobs=1, qc=True, qc_fail_on_nonconverged=False)
+        except ValueError as e:
+            if "No bonds" in str(e):
+                pytest.skip("Trajectory has no bonds (minimal fixture has no H atoms)")
+            raise
+        rmsd_entry = sim.get_qc_report()["rmsd_convergence"][0]
+        assert rmsd_entry["n_points"] == n_frames
+        assert sim.get_pivot_tables()[0].shape[1] == 3
 
     def test_run_kras_region(self, kras_pdb_path):
         """Integration test: run on Kras rep1 with residue range, first 50 frames."""

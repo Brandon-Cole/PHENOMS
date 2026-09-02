@@ -201,7 +201,12 @@ class SimulationSet:
         for i, input_path in enumerate(replicate_bar):
             replicate_bar.set_postfix_str(Path(input_path).name)
             top = None if self.topologies is None else self.topologies[i]
-            trajectory = load_and_select_residues(input_path, resid_range=None, top=top)
+            # QC (e.g. RMSD convergence) needs every frame regardless of sub_frames, so
+            # only cap the read when QC is off — otherwise behavior for qc=True is unchanged.
+            max_frames = self.sub_frames if not qc else None
+            trajectory = load_and_select_residues(
+                input_path, resid_range=None, top=top, max_frames=max_frames
+            )
             if qc:
                 rep = rmsd_convergence_report(
                     trajectory,

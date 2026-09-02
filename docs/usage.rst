@@ -7,16 +7,62 @@ Inputs
 PHENOMS accepts three input shapes; pick whichever matches what you already have:
 
 * **Multi-frame PDBs** — one PDB per replicate, already protein-centered/fitted.
-  Simplest and recommended when available (see "Simple form" below).
+  A multi-model PDB carries atoms/bonds *and* per-frame coordinates in one
+  file, so no separate topology is ever needed here. Simplest and recommended
+  when available (see "Simple form" below).
 * **Native trajectory + topology** — engine-native trajectories (``.xtc``, ``.trr``,
-  ``.dcd``, ``.nc``, …) loaded directly with a shared or per-replicate topology
-  (``.pdb``, ``.gro``, ``.tpr``, ``.prmtop``, …). No intermediate files written.
+  ``.dcd``, ``.nc``, ``.mdcrd``, …) loaded directly with a shared or per-replicate
+  topology. These trajectory formats carry coordinates only — no atom names,
+  bonds, or residues — so a separate topology file is **always required** for
+  this path. No intermediate files are written.
 * **Engine folders (GROMACS / OpenMM / AMBER)** — point at raw simulation output
-  directories; PHENOMS discovers the trajectory/topology pair per replicate,
-  applies PBC imaging/centering/fitting, and produces normalized PDBs for you.
+  directories; PHENOMS discovers the trajectory/topology pair per replicate
+  (same requirement as above), applies PBC imaging/centering/fitting, and
+  produces normalized PDBs for you.
 
 All three end up feeding :class:`~phenoms.SimulationSet`; see the matching
 sections below for code.
+
+File types by engine
+~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 15 25 30 30
+
+   * - Engine
+     - Trajectory
+     - Topology
+     - Extra install needed?
+   * - GROMACS
+     - ``.xtc``, ``.trr``
+     - ``.tpr`` (preferred — carries bonds and residue naming exactly as
+       simulated)
+     - **Yes** — ``pip install "phenoms[gromacs]"``. Without it, ``.tpr``
+       raises a clear error telling you to install the extra or convert with
+       ``gmx trjconv``.
+   * - GROMACS
+     - ``.xtc``, ``.trr``
+     - ``.gro`` or ``.pdb``
+     - No — read natively by MDTraj, core install only.
+   * - OpenMM
+     - ``.dcd``, ``.xtc``
+     - ``.pdb`` or ``.prmtop``
+     - No — read natively by MDTraj, core install only.
+   * - AMBER
+     - ``.nc``, ``.mdcrd``
+     - ``.prmtop``, ``.parm7``, ``.prm7``
+     - No — read natively by MDTraj, core install only.
+   * - Any engine
+     - multi-model ``.pdb``
+     - *(embedded in the same file)*
+     - No.
+
+The ``.tpr`` extra is the only optional-dependency gate on the read path:
+every other combination above works with a plain ``pip install phenoms``.
+If you have both a ``.tpr`` and a ``.gro``/``.pdb`` for the same replicate and
+don't want the extra, point PHENOMS at the ``.gro``/``.pdb`` instead — you
+only lose the exact bond/residue naming GROMACS itself used.
 
 Output location
 ---------------
@@ -162,10 +208,12 @@ PDBs, then return ready ``SimulationSet`` objects:
    set_b.run()
    comp.compare()
 
-Required files per replicate directory:
+Required files per replicate directory — see `File types by engine`_ above for
+the full breakdown; summary:
 
-* **GROMACS**: ``.xtc``/``.trr`` + topology ``.tpr`` (preferred, needs ``phenoms[gromacs]``)
-  or ``.gro``/``.pdb``
+* **GROMACS**: ``.xtc``/``.trr`` + topology. If both a ``.tpr`` and a
+  ``.gro``/``.pdb`` are present, ``.tpr`` is preferred (needs
+  ``phenoms[gromacs]``); otherwise ``.gro``/``.pdb`` is used with no extra.
 * **OpenMM**: ``.dcd``/``.xtc`` + ``.pdb``/``.prmtop``
 * **AMBER**: ``.nc``/``.mdcrd`` + ``.prmtop``/``.parm7``
 
