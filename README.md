@@ -32,7 +32,11 @@ uv pip install -e .
 PHENOMS falls back to MDTraj for detection.
 
 GROMACS `.tpr` topologies require the optional `MDAnalysis` dependency:
-`pip install -e ".[gromacs]"` (or `uv pip install -e ".[gromacs]"`).
+`pip install -e ".[gromacs]"` when building from source (or
+`pip install "phenoms[gromacs]"` if you installed from PyPI). Every other
+topology format (`.gro`, `.pdb`, `.prmtop`, …) needs no extra — see
+[Inputs](https://brandon-cole.github.io/PHENOMS/usage.html#inputs) for the
+full file-type breakdown by engine.
 
 ## Quick start
 
