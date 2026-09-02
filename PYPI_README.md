@@ -12,6 +12,17 @@ workflows, occupancy heatmaps, differential protection, and connectivity exports
 pip install phenoms
 ```
 
+Reading GROMACS `.tpr` topologies needs one optional extra:
+
+```bash
+pip install "phenoms[gromacs]"
+```
+
+Every other supported format (`.gro`/`.pdb` topologies, OpenMM `.dcd`, AMBER
+`.nc`/`.prmtop`, multi-frame PDBs) works with the plain install above — see
+the [Inputs docs](https://brandon-cole.github.io/PHENOMS/usage.html#inputs)
+for the full file-type breakdown.
+
 ## Quick start
 
 ```python
