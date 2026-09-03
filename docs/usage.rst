@@ -64,17 +64,47 @@ If you have both a ``.tpr`` and a ``.gro``/``.pdb`` for the same replicate and
 don't want the extra, point PHENOMS at the ``.gro``/``.pdb`` instead — you
 only lose the exact bond/residue naming GROMACS itself used.
 
-Output location
----------------
+.. _default-outputs:
 
-Artifacts default to ``./phenom_outputs/`` next to your working directory.
-Override globally:
+Output location and default artifacts
+--------------------------------------
 
-.. code-block:: bash
+``SimulationSet.run()`` always leaves a standard artifact bundle on disk
+unless you opt out — you don't need to pass ``output_dir=`` or call any
+``get_*``/``plot_*`` method yourself to get results:
 
-   export PHENOMS_OUTPUT_DIR=/path/to/my_phenom_runs
+* ``raw_data/*_hbonds.csv``, ``*_occupancy.csv``, ``*_pivot.csv``, ``manifest.json``
+  (and ``qc_report.json`` when ``qc=True``) — see :meth:`~phenoms.SimulationSet.export_run_artifacts`.
+* ``plots/`` — a heatmap per replicate, an aggregated heatmap across
+  replicates, and (when ``bond_statistics_threshold`` is set) lifetime/break-frequency
+  bar plots.
+* ``structure_bfactors.pdb`` — a reference structure with B-factors set to
+  per-residue H-bond variance across replicates, for coloring in
+  PyMOL/Chimera. The reference structure is **frame 0**: the input PDB itself
+  for ``pdb_files=`` input, or (for ``trajectories=``/``topology=`` input,
+  where no ready PDB exists) frame 0 of the first replicate's trajectory,
+  written alongside the other artifacts as ``reference_frame0.pdb``. PHENOMS
+  does not auto-trim equilibration on either path — if your simulation
+  includes a burn-in period, either pre-trim it first (``phenoms prep
+  --start-ps ...``) or treat frame 0 as a coloring reference only; it has no
+  effect on H-bond detection, which already ran over the full requested frame
+  range.
 
-Or pass ``output_dir=`` / ``--output-dir`` per run.
+Where this bundle goes, by ``output_dir=``:
+
+* **Omitted (default)** — a fresh, timestamped directory under
+  :func:`phenoms.default_output_root` (``./phenom_outputs/`` unless
+  ``PHENOMS_OUTPUT_DIR`` is set), so every run gets its own directory and
+  nothing is overwritten:
+
+  .. code-block:: bash
+
+     export PHENOMS_OUTPUT_DIR=/path/to/my_phenom_runs
+
+* **A path** — written there instead, e.g. ``output_dir=default_output_root() / "my_run"``.
+* **``False``** — disables all default output writing; results stay in memory
+  only, via ``sim.get_hbond_dfs()`` / ``get_pivot_tables()`` / ``get_qc_report()``,
+  or the individual ``plot_*``/``write_structure_bfactors`` methods called by hand.
 
 Simple form: multi-frame PDBs
 -----------------------------
@@ -113,9 +143,9 @@ One-shot helper:
 Native trajectories
 -------------------
 
-Load engine-native files without writing intermediate PDBs. ``output_dir`` is
-optional but required if you want anything written to disk — without it,
-``.run()`` only populates the in-memory result (``sim.get_pivot_tables()``, etc.):
+Load engine-native files without writing intermediate PDBs. As with the
+simple form, ``output_dir`` is optional — see `Output location and default
+artifacts`_ for what gets written when it's omitted:
 
 .. code-block:: python
 

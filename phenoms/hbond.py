@@ -333,7 +333,10 @@ def hbond_occupancy_table(hbonds_df):
         return pd.DataFrame(columns=["Bond Label", "Present Frames", "Total Frames", "Occupancy"])
 
     total_frames = int(hbonds_df["Frame"].nunique())
-    sub = hbonds_df[["Frame", "Bond Label"]]
+    # Cast explicitly to plain numpy object dtype: pandas' default string dtype
+    # (used automatically for str columns as of pandas 3.x) is not numpy-backed,
+    # and Polars requires pyarrow to convert non-numpy-backed columns otherwise.
+    sub = hbonds_df[["Frame", "Bond Label"]].astype({"Bond Label": object})
     lf = pl.from_pandas(sub, nan_to_null=True)
     out_pl = (
         lf.group_by("Bond Label")
