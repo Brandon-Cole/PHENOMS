@@ -69,9 +69,10 @@ only lose the exact bond/residue naming GROMACS itself used.
 Output location and default artifacts
 --------------------------------------
 
-``SimulationSet.run()`` always leaves a standard artifact bundle on disk
-unless you opt out — you don't need to pass ``output_dir=`` or call any
-``get_*``/``plot_*`` method yourself to get results:
+``SimulationSet.run()`` and :class:`~phenoms.ComparisonSet`'s ``.compare()``
+both always leave a standard artifact bundle on disk unless you opt out — you
+don't need to pass ``output_dir=`` or call any ``get_*``/``plot_*`` method
+yourself to get results. ``SimulationSet.run()`` writes:
 
 * ``raw_data/*_hbonds.csv``, ``*_occupancy.csv``, ``*_pivot.csv``, ``manifest.json``
   (and ``qc_report.json`` when ``qc=True``) — see :meth:`~phenoms.SimulationSet.export_run_artifacts`.
@@ -90,7 +91,24 @@ unless you opt out — you don't need to pass ``output_dir=`` or call any
   effect on H-bond detection, which already ran over the full requested frame
   range.
 
-Where this bundle goes, by ``output_dir=``:
+:class:`~phenoms.ComparisonSet`'s ``.compare()`` writes the equivalent bundle
+for a comparison:
+
+* ``raw_data/comparison.csv``, ``manifest.json`` — see
+  :meth:`~phenoms.ComparisonSet.export_comparison_artifacts`.
+* ``plots/difference.png`` and ``plots/heatmaps/`` — see
+  :meth:`~phenoms.ComparisonSet.plot_difference` and
+  :meth:`~phenoms.ComparisonSet.plot_heatmaps_both`.
+* ``structure_bfactors_diff.pdb`` — colored by occupancy difference
+  (``label_b`` − ``label_a``), using ``set_a``'s frame 0 as the reference
+  structure (same convention as above).
+
+Connectivity graph HTML (:meth:`~phenoms.ComparisonSet.export_connectivity_graph_html`
+and its community-aware variant) isn't part of either default bundle — both
+need a ``graph_mode``/threshold choice, so they stay opt-in.
+
+Where a bundle goes, by ``output_dir=`` (same for ``SimulationSet`` and
+``ComparisonSet``):
 
 * **Omitted (default)** — a fresh, timestamped directory under
   :func:`phenoms.default_output_root` (``./phenom_outputs/`` unless
@@ -191,22 +209,22 @@ Comparison sets
 ---------------
 
 :class:`~phenoms.ComparisonSet` may be constructed before ``.run()``; methods
-that need pivots validate at call time:
+that need pivots validate at call time. ``.compare()`` writes the standard
+comparison bundle by default (see `Output location and default artifacts`_
+above), same as ``SimulationSet.run()``:
 
 .. code-block:: python
 
-   from phenoms import SimulationSet, ComparisonSet, default_output_root
+   from phenoms import SimulationSet, ComparisonSet
 
-   base = default_output_root() / "my_run"
    a = SimulationSet(["a1.pdb", "a2.pdb"], resid_range=(50, 70), sub_frames=100)
    b = SimulationSet(["b1.pdb", "b2.pdb"], resid_range=(50, 70), sub_frames=100)
    cmp = ComparisonSet(a, b, label_a="apo", label_b="holo")
    a.run()
    b.run()
    cmp.compare()
-   cmp.export_comparison_artifacts(base / "comparison")
-   cmp.plot_difference()
-   # cmp.export_connectivity_graph_html("network.html")
+   # raw_data/comparison.csv, plots/difference.png, plots/heatmaps/, structure_bfactors_diff.pdb
+   # cmp.export_connectivity_graph_html("network.html")  # opt-in, not part of the default bundle
 
 Engine folders (GROMACS / OpenMM / AMBER)
 -----------------------------------------

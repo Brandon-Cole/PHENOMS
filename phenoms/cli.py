@@ -281,6 +281,7 @@ def compare_cmd(
         sub_frames=sub_frames,
         output_dir_a=out / label_a,
         output_dir_b=out / label_b,
+        output_dir=out / "comparison",
         frame_dt_ps=frame_dt_ps,
         label_a=label_a,
         label_b=label_b,
@@ -289,7 +290,6 @@ def compare_cmd(
     set_a.run(n_jobs=n_jobs)
     set_b.run(n_jobs=n_jobs)
     comp.compare()
-    comp.export_comparison_artifacts(out / "comparison")
     click.echo(f"Wrote comparison artifacts under {out / 'comparison'}")
 
 
