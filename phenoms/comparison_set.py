@@ -9,19 +9,42 @@ import json
 from pathlib import Path
 
 from phenoms.analysis import extract_residue_numbers
+from phenoms.outputs import timestamped_run_dir
 from phenoms.plotting import plot_difference, plot_heatmap, plot_heatmap_with_legend
 
 
 class ComparisonSet:
     """Two simulation sets (e.g. no ligand vs ligand): compare, plot difference, write PDB, run PCA/t-SNE/Isomap."""
 
-    def __init__(self, set_a, set_b, label_a="set_a", label_b="set_b"):
+    def __init__(self, set_a, set_b, label_a="set_a", label_b="set_b", *, output_dir=None):
+        """
+        Parameters
+        ----------
+        set_a, set_b : SimulationSet
+            Both must already be ``.run()``.
+        label_a, label_b : str
+            Column names / plot labels for the two sets.
+        output_dir : str, pathlib.Path, False, or None
+            Where the standard comparison bundle (comparison CSV, manifest,
+            difference plot, aligned heatmaps, and a differential
+            structure-colored PDB) is written after a successful
+            :meth:`compare`. ``None`` (default) creates a fresh timestamped
+            directory under :func:`phenoms.default_output_root`, matching
+            :class:`~phenoms.SimulationSet`. Pass an explicit path to control
+            the location, or ``False`` to disable all default output writing.
+        """
         self.set_a = set_a
         self.set_b = set_b
         self.label_a = label_a
         self.label_b = label_b
         self._comparison_df = None
         self._comparison_params = None
+        if output_dir is False:
+            self.output_dir = None
+        elif output_dir is None:
+            self.output_dir = timestamped_run_dir("comparisonset")
+        else:
+            self.output_dir = Path(output_dir).expanduser().resolve()
 
     def _require_both_run(self):
         if not self.set_a.get_pivot_tables() or not self.set_b.get_pivot_tables():
@@ -49,7 +72,36 @@ class ComparisonSet:
             "flip_difference": flip_difference,
             "donor_aggregation": donor_aggregation,
         }
+        if self.output_dir is not None:
+            self._write_default_outputs()
         return self._comparison_df
+
+    def _write_default_outputs(self):
+        """
+        Write the standard comparison bundle to ``self.output_dir``:
+        ``comparison.csv`` + manifest (:meth:`export_comparison_artifacts`), a
+        difference plot, aligned heatmaps for both sets, and a differential
+        structure-colored PDB (see :meth:`_write_default_structure_bfactors`).
+        """
+        self.export_comparison_artifacts(self.output_dir)
+        plots_dir = self.output_dir / "plots"
+        plots_dir.mkdir(parents=True, exist_ok=True)
+        self.plot_difference(save_path=str(plots_dir / "difference.png"))
+        heatmaps_dir = plots_dir / "heatmaps"
+        heatmaps_dir.mkdir(parents=True, exist_ok=True)
+        self.plot_heatmaps_both(save_dir=str(heatmaps_dir))
+        self._write_default_structure_bfactors(self.output_dir / "structure_bfactors_diff.pdb")
+
+    def _write_default_structure_bfactors(self, output_path):
+        """
+        Color a reference structure by per-residue occupancy difference
+        (``label_b`` − ``label_a``, per :meth:`compare`'s ``flip_difference``).
+        The reference structure comes from ``set_a``, via the same frame-0
+        convention as :class:`~phenoms.SimulationSet`'s own default output
+        (see :meth:`~phenoms.SimulationSet._resolve_reference_pdb`).
+        """
+        ref_pdb = self.set_a._resolve_reference_pdb(self.output_dir)
+        self.write_pdb_bfactors(str(ref_pdb), str(output_path))
 
     def export_connectivity_graph_html(
         self,

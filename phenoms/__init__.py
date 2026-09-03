@@ -300,6 +300,7 @@ def comparison_sets_from_dirs(
     bond_statistics_threshold=None,
     output_dir_a=None,
     output_dir_b=None,
+    output_dir=None,
     frame_dt_ps=1000.0,
     start_ps=None,
     end_ps=None,
@@ -312,6 +313,10 @@ def comparison_sets_from_dirs(
 ):
     """
     Build two SimulationSet objects from two class directories (e.g., WT and MUT).
+
+    ``output_dir`` controls where the ComparisonSet's own default bundle goes
+    (``None`` = auto-timestamped, ``False`` = disabled); ``output_dir_a``/
+    ``output_dir_b`` control each SimulationSet's own bundle independently.
 
     Returns (set_a, set_b, comparison_set).
     """
@@ -345,4 +350,6 @@ def comparison_sets_from_dirs(
         fit=fit,
         backbone_only=backbone_only,
     )
-    return set_a, set_b, ComparisonSet(set_a, set_b, label_a=label_a, label_b=label_b)
+    return set_a, set_b, ComparisonSet(
+        set_a, set_b, label_a=label_a, label_b=label_b, output_dir=output_dir
+    )

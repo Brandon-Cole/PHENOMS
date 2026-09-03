@@ -305,27 +305,36 @@ class SimulationSet:
             )
         self._write_default_structure_bfactors(self.output_dir / "structure_bfactors.pdb")
 
-    def _write_default_structure_bfactors(self, output_path):
+    def _resolve_reference_pdb(self, extra_output_dir):
         """
-        Color a reference structure by per-residue H-bond variance across
-        replicates (see :meth:`write_structure_bfactors`).
+        Path to a single-frame reference structure for B-factor coloring: the
+        first replicate's PDB for ``pdb_files=`` input (frame 0 embedded), or
+        frame 0 of the first replicate's trajectory for ``trajectories=`` input
+        (no ready PDB exists there, so it's written out as
+        ``reference_frame0.pdb`` under ``extra_output_dir``).
 
-        The reference structure is frame 0: the first replicate's PDB for
-        ``pdb_files=`` input, or frame 0 of the first replicate's trajectory
-        (written out as ``reference_frame0.pdb`` alongside the other artifacts)
-        for ``trajectories=`` input. PHENOMS does not auto-trim equilibration on
-        either path, so if your simulation includes a burn-in period, either
-        pre-trim it first (e.g. ``phenoms prep --start-ps``) or treat this
-        reference structure as a coloring target only — it plays no part in
-        H-bond detection, which already ran on the full requested frame range.
+        PHENOMS does not auto-trim equilibration on either path, so if your
+        simulation includes a burn-in period, either pre-trim it first (e.g.
+        ``phenoms prep --start-ps``) or treat this reference structure as a
+        coloring target only — it plays no part in H-bond detection, which
+        already ran on the full requested frame range. Shared with
+        :class:`~phenoms.ComparisonSet`'s own default structure coloring.
         """
         if self.input_kind == "pdb":
-            ref_pdb = self.pdb_files[0]
-        else:
-            top = None if self.topologies is None else self.topologies[0]
-            frame0 = load_trajectory(self.pdb_files[0], top=top, max_frames=1)
-            ref_pdb = self.output_dir / "reference_frame0.pdb"
-            frame0.save_pdb(str(ref_pdb))
+            return Path(self.pdb_files[0])
+        top = None if self.topologies is None else self.topologies[0]
+        frame0 = load_trajectory(self.pdb_files[0], top=top, max_frames=1)
+        ref_pdb = Path(extra_output_dir) / "reference_frame0.pdb"
+        frame0.save_pdb(str(ref_pdb))
+        return ref_pdb
+
+    def _write_default_structure_bfactors(self, output_path):
+        """
+        Color a reference structure (see :meth:`_resolve_reference_pdb`) by
+        per-residue H-bond variance across replicates (see
+        :meth:`write_structure_bfactors`).
+        """
+        ref_pdb = self._resolve_reference_pdb(self.output_dir)
         self.write_structure_bfactors(str(ref_pdb), str(output_path), metric="variance")
 
     def export_run_artifacts(self, output_dir):

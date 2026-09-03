@@ -25,16 +25,24 @@ And directly under ``output_dir``:
 Differential / comparison outputs
 ---------------------------------
 
-Via :meth:`phenoms.ComparisonSet.export_comparison_artifacts` and related methods:
+``ComparisonSet.compare()`` writes this bundle by default too (see
+:ref:`default-outputs`) — no need to call ``export_comparison_artifacts`` or
+``plot_difference`` yourself:
 
-* **``comparison.csv``** — per-donor occupancy in each condition, raw and clipped
-  difference (clipped to ``[-1, 1]`` for visualization / B-factors)
-* **Difference plots** — :meth:`~phenoms.ComparisonSet.plot_difference` with manual
-  or autocorrelation-based thresholds
-* **Connectivity HTML** — residue graphs from occupancy or Δ occupancy
-  (:meth:`~phenoms.ComparisonSet.export_connectivity_graph_html`,
-  community-aware variant available)
-* **PDB B-factors** — map differential or single-set metrics for PyMOL/Chimera
+* **``raw_data/comparison.csv``**, **``manifest.json``** — per-donor occupancy
+  in each condition, raw and clipped difference (clipped to ``[-1, 1]`` for
+  visualization / B-factors); see :meth:`~phenoms.ComparisonSet.export_comparison_artifacts`
+* **``plots/difference.png``** — :meth:`~phenoms.ComparisonSet.plot_difference`
+  with manual or autocorrelation-based thresholds
+* **``plots/heatmaps/``** — aligned per-replicate heatmaps for both sets, via
+  :meth:`~phenoms.ComparisonSet.plot_heatmaps_both`
+* **``structure_bfactors_diff.pdb``** — differential B-factors (``label_b`` −
+  ``label_a``) on ``set_a``'s frame-0 reference structure
+
+Opt-in only (not part of the default bundle, since they need a
+``graph_mode``/threshold choice): **Connectivity HTML** — residue graphs from
+occupancy or Δ occupancy (:meth:`~phenoms.ComparisonSet.export_connectivity_graph_html`,
+community-aware variant available).
 
 Default location
 ----------------

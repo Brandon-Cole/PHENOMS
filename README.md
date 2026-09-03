@@ -41,7 +41,7 @@ full file-type breakdown by engine.
 ## Quick start
 
 ```python
-from phenoms import SimulationSet, ComparisonSet, default_output_root
+from phenoms import SimulationSet, ComparisonSet
 
 sim = SimulationSet(
     pdb_files=["rep1.pdb", "rep2.pdb"],
@@ -58,7 +58,8 @@ b = SimulationSet(["b1.pdb", "b2.pdb"], sub_frames=100)
 cmp = ComparisonSet(a, b, label_a="apo", label_b="holo")
 a.run(); b.run()
 cmp.compare()
-cmp.export_comparison_artifacts(default_output_root() / "comparison")
+# Writes comparison.csv, a difference plot, aligned heatmaps, and a differential
+# structure-colored PDB the same way — same output_dir=/False controls apply.
 ```
 
 CLI (optional): `phenoms prep`, `phenoms run`, `phenoms compare` — see the [docs](https://brandon-cole.github.io/PHENOMS/).
