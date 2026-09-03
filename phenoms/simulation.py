@@ -15,7 +15,8 @@ def default_n_jobs():
     """Parallel workers for MDTraj frame loop: all CPUs minus two (minimum 1)."""
     return max(1, (os.cpu_count() or 4) - 2)
 
-from phenoms.io import load_and_select_residues, normalize_topology_list
+from phenoms.io import load_and_select_residues, load_trajectory, normalize_topology_list
+from phenoms.outputs import timestamped_run_dir
 from phenoms.hbond import hbond_occupancy_table, process_frames, process_frames_all
 from phenoms.analysis import extract_residue_numbers, create_pivot_table, calculate_bond_statistics, fluctuating_bonds
 from phenoms.plotting import (
@@ -69,9 +70,15 @@ class SimulationSet:
         bond_statistics_threshold : float or None
             If set, compute bond statistics (lifetime, break frequency) and
             mean ± std across replicates; used for bar plots and aggregated heatmap.
-        output_dir : str, pathlib.Path, or None
-            If set, after a successful :meth:`run`, per-replicate CSVs and a manifest are
-            written under ``output_dir/raw_data/`` (see :meth:`export_run_artifacts`).
+        output_dir : str, pathlib.Path, False, or None
+            Where the standard artifact bundle (per-replicate CSVs, manifest,
+            heatmap/statistics plots, and a structure-colored reference PDB) is
+            written after a successful :meth:`run`. ``None`` (default) creates a
+            fresh timestamped directory under :func:`phenoms.default_output_root`
+            so a run always leaves output behind without naming a path. Pass an
+            explicit path to control the location, or ``False`` to disable all
+            default output writing and keep results in memory only (via the
+            ``get_*`` accessors).
         trajectories : list of str or str or None
             Native trajectory files (``.xtc``, ``.trr``, ``.dcd``, ``.nc``, …).
             Requires ``topology`` or ``topologies``.
@@ -117,7 +124,12 @@ class SimulationSet:
         self.sub_frames = sub_frames
         self.bond_statistics_threshold = bond_statistics_threshold
         self.backbone_only = bool(backbone_only)
-        self.output_dir = Path(output_dir).expanduser().resolve() if output_dir is not None else None
+        if output_dir is False:
+            self.output_dir = None
+        elif output_dir is None:
+            self.output_dir = timestamped_run_dir("simulationset")
+        else:
+            self.output_dir = Path(output_dir).expanduser().resolve()
 
         self._hbond_dfs = []
         self._pivot_tables = []
@@ -269,9 +281,52 @@ class SimulationSet:
             self._compute_bond_statistics()
 
         if self.output_dir is not None:
-            self.export_run_artifacts(self.output_dir)
+            self._write_default_outputs()
 
         return self
+
+    def _write_default_outputs(self):
+        """
+        Write the standard artifact bundle to ``self.output_dir``: raw/occupancy/
+        pivot CSVs and a manifest (:meth:`export_run_artifacts`), per-replicate
+        and aggregated heatmaps, bond-statistics bar plots (if
+        ``bond_statistics_threshold`` was set), and a structure-colored
+        reference PDB (see :meth:`_write_default_structure_bfactors`).
+        """
+        self.export_run_artifacts(self.output_dir)
+        plots_dir = self.output_dir / "plots"
+        plots_dir.mkdir(parents=True, exist_ok=True)
+        self.plot_heatmaps(save_dir=str(plots_dir))
+        self.plot_aggregated_heatmap(save_path=str(plots_dir / "aggregated_heatmap.png"))
+        if self.bond_statistics_threshold is not None:
+            self.plot_bond_statistics(
+                save_lifetime_path=str(plots_dir / "bond_lifetimes.png"),
+                save_break_path=str(plots_dir / "break_frequencies.png"),
+            )
+        self._write_default_structure_bfactors(self.output_dir / "structure_bfactors.pdb")
+
+    def _write_default_structure_bfactors(self, output_path):
+        """
+        Color a reference structure by per-residue H-bond variance across
+        replicates (see :meth:`write_structure_bfactors`).
+
+        The reference structure is frame 0: the first replicate's PDB for
+        ``pdb_files=`` input, or frame 0 of the first replicate's trajectory
+        (written out as ``reference_frame0.pdb`` alongside the other artifacts)
+        for ``trajectories=`` input. PHENOMS does not auto-trim equilibration on
+        either path, so if your simulation includes a burn-in period, either
+        pre-trim it first (e.g. ``phenoms prep --start-ps``) or treat this
+        reference structure as a coloring target only — it plays no part in
+        H-bond detection, which already ran on the full requested frame range.
+        """
+        if self.input_kind == "pdb":
+            ref_pdb = self.pdb_files[0]
+        else:
+            top = None if self.topologies is None else self.topologies[0]
+            frame0 = load_trajectory(self.pdb_files[0], top=top, max_frames=1)
+            ref_pdb = self.output_dir / "reference_frame0.pdb"
+            frame0.save_pdb(str(ref_pdb))
+        self.write_structure_bfactors(str(ref_pdb), str(output_path), metric="variance")
 
     def export_run_artifacts(self, output_dir):
         """

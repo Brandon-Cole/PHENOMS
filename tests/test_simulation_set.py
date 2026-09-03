@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import pandas as pd
 
-from phenoms import SimulationSet
+from phenoms import SimulationSet, default_output_root
 from phenoms.io import load_and_select_residues
 from phenoms.hbond import process_frames
 
@@ -146,3 +146,84 @@ class TestSimulationSet:
         sim.run(n_jobs=1)
         assert len(sim.get_pivot_tables()) == 1
         assert len(sim.get_hbond_dfs()) == 1
+
+
+class TestDefaultOutputs:
+    """
+    SimulationSet.run() writes a standard artifact bundle (tables, plots, a
+    structure-colored reference PDB) by default, to a fresh timestamped
+    directory when output_dir isn't given. output_dir=False opts back out to
+    pure in-memory results (the pre-existing behavior).
+    """
+
+    def _bundle_paths(self, output_dir):
+        return {
+            "raw_data": output_dir / "raw_data",
+            "manifest": output_dir / "manifest.json",
+            "aggregated_heatmap": output_dir / "plots" / "aggregated_heatmap.png",
+            "structure_bfactors": output_dir / "structure_bfactors.pdb",
+        }
+
+    def test_default_output_dir_is_timestamped_under_default_root(self, kras_pdb_path):
+        sim = SimulationSet([kras_pdb_path], sub_frames=5)
+        assert sim.output_dir.parent == default_output_root()
+        assert sim.output_dir.name.startswith("simulationset_")
+
+    def test_run_writes_default_bundle(self, kras_pdb_path):
+        sim = SimulationSet([kras_pdb_path], sub_frames=5)
+        sim.run(n_jobs=1)
+        for label, path in self._bundle_paths(sim.output_dir).items():
+            assert path.exists(), f"missing default output: {label} ({path})"
+
+    def test_output_dir_false_disables_writing(self, kras_pdb_path):
+        sim = SimulationSet([kras_pdb_path], sub_frames=5, output_dir=False)
+        sim.run(n_jobs=1)
+        assert sim.output_dir is None
+
+    def test_explicit_output_dir_is_used_and_resolved(self, kras_pdb_path, tmp_path):
+        target = tmp_path / "custom_run"
+        sim = SimulationSet([kras_pdb_path], sub_frames=5, output_dir=target)
+        assert sim.output_dir == target.resolve()
+        sim.run(n_jobs=1)
+        for path in self._bundle_paths(sim.output_dir).values():
+            assert path.exists()
+
+    def test_structure_bfactors_reference_is_frame_0_of_input_pdb(self, kras_pdb_path, tmp_path):
+        """
+        For pdb_files= input, the structure-coloring reference is the input PDB
+        itself (frame 0) -- no separate reference file needs to be written.
+        """
+        sim = SimulationSet([kras_pdb_path], sub_frames=5, output_dir=tmp_path / "run")
+        sim.run(n_jobs=1)
+        assert not (sim.output_dir / "reference_frame0.pdb").exists()
+        assert (sim.output_dir / "structure_bfactors.pdb").exists()
+
+    def test_structure_bfactors_reference_is_frame_0_for_trajectory_input(self, tmp_path):
+        """
+        For trajectories=/topology= input there is no ready reference PDB, so
+        frame 0 of the trajectory is written out as reference_frame0.pdb and
+        used as the coloring target.
+        """
+        base = md.load(MINIMAL_PDB)
+        xtc_path = tmp_path / "traj.xtc"
+        pdb_path = tmp_path / "top.pdb"
+        base.save_xtc(str(xtc_path))
+        base.save_pdb(str(pdb_path))
+
+        sim = SimulationSet.from_trajectories(
+            [str(xtc_path)], topology=str(pdb_path), output_dir=tmp_path / "run"
+        )
+        # Skip real detection (minimal fixture has no bonds) and drive the
+        # output-writing step directly with a fabricated pivot table.
+        pivot = pd.DataFrame(
+            {0: [1, 0], 1: [1, 1], 2: [0, 1]},
+            index=["ALA1 -- ALA1", "GLY2 -- ALA1"],
+        )
+        sim._pivot_tables = [pivot]
+
+        out_path = sim.output_dir / "structure_bfactors.pdb"
+        sim.output_dir.mkdir(parents=True, exist_ok=True)
+        sim._write_default_structure_bfactors(out_path)
+
+        assert (sim.output_dir / "reference_frame0.pdb").exists()
+        assert out_path.exists()

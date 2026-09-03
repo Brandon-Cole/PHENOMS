@@ -9,6 +9,7 @@ outside the installed package tree. If unset, defaults to ``./phenom_outputs``
 from __future__ import annotations
 
 import os
+from datetime import datetime
 from pathlib import Path
 
 
@@ -24,3 +25,16 @@ def default_output_root() -> Path:
     if env:
         return Path(env).expanduser().resolve()
     return (Path.cwd() / "phenom_outputs").resolve()
+
+
+def timestamped_run_dir(prefix: str = "run") -> Path:
+    """
+    A fresh directory under :func:`default_output_root`, named
+    ``<prefix>_<YYYYmmdd_HHMMSS_ffffff>``.
+
+    Used as the default ``output_dir`` for :class:`~phenoms.SimulationSet` so a
+    run leaves the standard artifact bundle on disk without the caller having
+    to name a path, while never colliding with a previous run's output.
+    """
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    return default_output_root() / f"{prefix}_{stamp}"

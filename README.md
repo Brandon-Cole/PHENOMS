@@ -47,9 +47,11 @@ sim = SimulationSet(
     pdb_files=["rep1.pdb", "rep2.pdb"],
     resid_range=(50, 70),
     sub_frames=100,
-    output_dir=default_output_root() / "my_run",
 )
 sim.run()
+# Writes CSVs, heatmap plots, and a structure-colored PDB to a fresh timestamped
+# dir under default_output_root() by default. Pass output_dir=<path> to control
+# where, or output_dir=False for in-memory-only results.
 
 a = SimulationSet(["a1.pdb", "a2.pdb"], sub_frames=100)
 b = SimulationSet(["b1.pdb", "b2.pdb"], sub_frames=100)
